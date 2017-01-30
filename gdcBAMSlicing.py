@@ -4,6 +4,8 @@ import datetime
 import time
 import os
 import pprint
+import requests
+import json
 
 
 def getAuthToken(tokenfilename):
@@ -12,14 +14,43 @@ def getAuthToken(tokenfilename):
 	tokenfile.close()
 	return token
 
-def sliceByGene(token, gene, bamfileid, outputfile):
+def sliceByGene(token, gene, bamfileid, outputfile, loghandle):
 	baseURL = "https://gdc-api.nci.nih.gov/slicing/view/"
 	
+	#Set up the headers
+	headers = {
+		"X-Auth-Token" : token,
+		"Content-Type" : "application/json"
+	}
+	
+	logIt(loghandle, headers)
+	
+	#Request a single gene
 	requestJSON = {
-		"gencode" : [
+		"hgnc" : [
 			gene
 		]
 	} 
+	logIt(loghandle, requestJSON)
+	
+	#Append the bam file ID to create the request
+	url = baseURL + bamfileid
+	logIt(loghandle,url)
+
+	#Make the Request  
+	#http://docs.python-requests.org/en/master/user/advanced/
+	#http://stackoverflow.com/questions/10768522/python-send-post-with-header
+	
+	logIt(loghandle,"Starting request")
+	data = requests.post(url, headers=headers, data=json.dumps(requestJSON))
+	logIt(loghandle,("Request Complete Status Code: %s" % str(data.status_code)))
+
+	#write the data to a file
+	logIt(loghandle,("Writing data to %s" % outputfile))
+	outfile = open(outputfile,"w")
+	outfile.write(data.content)
+	logIt(loghandle, "Writing done")
+	outfile.close()
 	
 def vPrint(doit, message):
 	if doit:
@@ -56,9 +87,14 @@ def main(args):
 	vPrint(args.verbose,gdctoken)
 	logIt(logfile, gdctoken)
 	
+	#Test BAM File
+	testbamfileid = '9419c6a0-48cb-4db5-a3cb-357ad56aba20'
+	
+	sliceByGene(gdctoken, args.genename, testbamfileid, args.bamfilename, logfile)
+	
 	elapsedtime = str(datetime.timedelta(seconds = (time.time() - starttime)))
 	
-	logIt(logfile, "Elapsed time: elapsedtime")
+	logIt(logfile, ("Elapsed time: %s" % str(elapsedtime)))
 	logfile.close()
 
 
@@ -69,6 +105,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-v", "--verbose", action = "store_true", help = 'Enable verbose feedback.')
 	parser.add_argument("-l", "--logfile", nargs = '?', const = None , help="Log file.  Will default to gdc-log.txt if left blank")
+	parser.add_argument("-g", "--genename", required = True, help="Name of the gene to slice")
+	parser.add_argument("-b", "--bamfilename", required = True, help = "Name for the output bam file")
 	parser.add_argument("-t","--token", nargs = '?', required = True, help = "GDC Authoriation Token file")
 	
 	args = parser.parse_args()
