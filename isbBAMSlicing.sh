@@ -12,6 +12,7 @@ while getopts "b:r:o:" args; do
       ;;
     o)
       OUTPUTFILE=${OPTARG}
+      ;;
     *)
       usage
       ;;
@@ -21,5 +22,8 @@ if [ -z "${BAMFILE}" ] || [ -z "${RANGE}" ] || [ -z "${OUTPUTFILE}" ]; then
   usage
 fi
 
-
+#export the oauth token
+export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token`
+#Do the slice
+echo "samtools view -b $BAMFILE -o $OUTPUTFILE $RANGE"
 samtools view -b $BAMFILE -o $OUTPUTFILE $RANGE
