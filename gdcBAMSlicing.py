@@ -27,7 +27,7 @@ def sliceByGene(token, gene, bamfileid, outputfile, loghandle):
 
 	#Request a single gene
 	queryJSON = {
-		"hgnc" : [
+		"gencode" : [
 			gene
 		]
 	}
@@ -106,16 +106,25 @@ def main(args):
 	vPrint(args.verbose,gdctoken)
 	logIt(logfile, gdctoken)
 
-	#Test BAM File
-	testbamfileid = '9419c6a0-48cb-4db5-a3cb-357ad56aba20'
 
-	if args.genename is not None:
-		sliceByGene(gdctoken, args.genename, testbamfileid, args.bamfilename, logfile)
-	elif args.range is not None:
-		sliceByRange(gdctoken, args.range, testbamfileid, args.bamfilename, logfile)
-	else:
-		print "No gene or range specified, aborting"
-		logIt(logfile,"No gene or range specified")
+	#Test BAM File
+	#hg38
+	#testbamfileid = '9419c6a0-48cb-4db5-a3cb-357ad56aba20'
+	#hg19
+	#testbamfileid = 'b30167c1-aed7-4b80-91ff-500456bd7394'
+
+	#Loop through IDs
+	idfile = open(args.listfile,"r")
+	for fileid in idfile.readlines():
+		fileid = fileid.rstrip()
+		bamfilename = fileid + ".bam"
+		if args.genename is not None:
+			sliceByGene(gdctoken, args.genename, fileid, bamfilename, logfile)
+		elif args.range is not None:
+			sliceByRange(gdctoken, args.range, fileid, bamfilename, logfile)
+		else:
+			print "No gene or range specified, aborting"
+			logIt(logfile,"No gene or range specified")
 
 	elapsedtime = str(datetime.timedelta(seconds = (time.time() - starttime)))
 
@@ -132,8 +141,10 @@ if __name__ == "__main__":
 	parser.add_argument("-l", "--logfile", nargs = '?', const = None, help="Log file.  Will default to gdc-log.txt if left blank")
 	parser.add_argument("-g", "--genename", nargs = '?', const = None, help="Name of the gene to slice")
 	parser.add_argument("-r", "--range", nargs = '?', const = None, help="Genomic range to slice (chr:start-end)")
-	parser.add_argument("-b", "--bamfilename", required = True, help = "Name for the output bam file")
+	parser.add_argument("-b", "--bamfilename", help = "Name for the output bam file")
 	parser.add_argument("-t","--token", nargs = '?', required = True, help = "GDC Authoriation Token file")
+	parser.add_argument("-f","--listfile", nargs = '?', const = None, help = "File containing list of GDC Bam file IDs")
+	parser.add_argument("-z", "--testmode", nargs = '?', const = None, help = "Run program in test mode")
 
 	args = parser.parse_args()
 	main(args)
