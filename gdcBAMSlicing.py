@@ -26,12 +26,12 @@ def sliceByGene(token, gene, bamfileid, outputfile, loghandle):
 	logIt(loghandle, headers)
 
 	#Request a single gene
-	requestJSON = {
+	queryJSON = {
 		"hgnc" : [
 			gene
 		]
 	}
-	logIt(loghandle, requestJSON)
+	logIt(loghandle, queryJSON)
 
 	#Append the bam file ID to create the request
 	url = baseURL + bamfileid
