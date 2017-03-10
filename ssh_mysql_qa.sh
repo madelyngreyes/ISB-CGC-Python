@@ -43,7 +43,6 @@ for ((i=0; i<${#ARRAY[*]};i++)); do
 	fi
 done
 
-exit
 
 if [[ "${TUNNEL}" -eq "True" ]] ; then
 	ssh ${USER}@${IP} -L ${PORT}:localhost:${PORT}
