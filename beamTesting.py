@@ -88,6 +88,8 @@ def main():
 	basicFlatmap()
 	print "Running complexFlatMap"
 	complexFlatMap()
+	print "Runninq BQ query"
+	runQuery()
 	
 if __name__ == '__main__':
 	main()
