@@ -7,16 +7,19 @@ import time
 
 
 project = 'cgc-05-0016'
-input_table = 'isb-cgc:test.TCGA_Annotation'
+input_table = 'isb-cgc.test.TCGA_Annotation'
 
 filename = "names"
 directory = "."
 
 
 def runQuery():
-	input_query = "SELECT annotation_gdc_id, category, classification, status, entity_type, project_short_name, entity_barcode FROM `isb-cgc.test.TCGA_Annotation` WHERE classification = 'Observation' LIMIT 10"
+	input_query = 'SELECT annotation_gdc_id, category, classification, status, entity_type, project_short_name, entity_barcode ' \
+		'FROM `isb-cgc.test.TCGA_Annotation` ' \
+		'WHERE classification = \'Observation\' ' \
+		'LIMIT 10'
 	
-	p = beam.Pipeline(argv = ['--project', project])
+	p = beam.Pipeline(argv=['--project', project])
 	(p 
 		| 'read' >> beam.Read(beam.io.BigQuerySource(query=input_query)) 
 		| 'save' >> beam.Write(beam.io.WriteToText('./beam_test.txt')))
