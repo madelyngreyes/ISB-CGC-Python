@@ -162,21 +162,21 @@ def usersGet(service):
 #Annotation testing (Currently TCGA only)
 def aliquotAnnotations(service,barcode):
 	try:
-		data = service.aliquot_annotations(aliquot_barcode=barcode).execute()
+		data = service.aliquots().annotations(aliquot_barcode=barcode).execute()
 		return data
 	except HttpError as exception:
 		raise exception
 
 def sampleAnnotations(service,barcode):
 	try:
-		data = service.sample_annotations(sample_barcode=barcode).execute()
+		data = service.samples().annotations(sample_barcode=barcode).execute()
 		return data
 	except HttpError as exception:
 		raise exception
 
 def caseAnnotations(service,barcode):
 	try:
-		data = service.case_annotations(case_barcode=barcode).execute()
+		data = service.cases().annotations(case_barcode=barcode).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -200,12 +200,18 @@ def main(args):
 	program_api = getProgram(args.program)
 	site = getSite(args.tier)
 	cohort_id = '1' #Seems like a reasonable default but will get a real one below
-	tcga_preview_request = {"Study" : ["BRCA", "UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}
-	tcga_patient_barcode = 'TCGA-W5-AA2R'
-	tcga_sample_barcode = 'TCGA-W5-AA2R-01A'
-	cohort_name = "%s_%s_%s_API_Testing_Cohort" % (now.month, now.day, now.year)
+	#preview_request = {"Study" : ["BRCA", "UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}
+	preview_request = {
+		'TCGA' : '{"project_short_name" : ["BRCA", "UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}',
+		'TARGET' : '{"project_short_name" : ["AML", "WT"], "age_at_diagnosis_gte": 7}',
+		'CCLE' : '{"project_short_name" : ["COAD", "READ"], "gender": "M"}'
+		}
+	case_barcode = {'TCGA' : 'TCGA-DJ-A3US', 'TARGET' : 'TARGET-20-PABLDZ', 'CCLE' : 'FU-OV-1'}
+	sample_barcode = {'TCGA' : 'TCGA-DJ-A3US-10A', 'TARGET' : 'TARGET-20-PABLDZ-04A', 'CCLE' : 'CCLE-FU-OV-1'}
+	aliquot_barcode = {'TCGA' :'TCGA-DJ-A3US-10A-01D-A22C-01', 'TARGET' : 'TARGET-20-PABLDZ-04A-01R', 'CCLE' : 'CCLE-FU-OV-1-RNA-08'}
+	
+	cohort_name = "%s_%s_%s_%s_API_Testing_Cohort" % (now.month, now.day, now.year, args.program)
 	testing_cohort_id = None
-	#program_list = ["TCGA", "TARGET", "CCLE"]
 	
 
 	#Get credentials
@@ -244,7 +250,7 @@ def main(args):
 	#test cohorts().preview()
 	vPrint(args.verbose, "cohorts().preview() test")
 	try:
-		data = cohortsPreview(auth_service, preview_request)
+		data = cohortsPreview(auth_service, json.loads(preview_request[args.program]))
 		logTest(logfile, args.tier, "Cohorts Preview Test", data['patient_count'])
 	except HttpError as exception:
 		logTest(logfile, args.tier, "Cohorts Preview ERROR", exception)
@@ -260,7 +266,7 @@ def main(args):
 	#test cohorts().create()
 	vPrint(args.verbose, "cohorts().create() test")
 	try:
-		data = cohortsCreate(auth_service, cohort_name, preview_request)
+		data = cohortsCreate(auth_service, cohort_name, json.loads(preview_request)
 		testing_cohort_id = data['id']  #will be used to delete in the next test
 		logTest(logfile,args.tier,"Cohorts Create Test", testing_cohort_id)
 	except HttpError as exception:
@@ -279,10 +285,10 @@ def main(args):
 	
 	#Test Patient endpoints
 	
-	#test patients().get()
-	vPrint(args.verbose, "patients().get() test")
+	#test cases().get()
+	vPrint(args.verbose, "cases().get() test")
 	try:
-		data = patientsGet(auth_service, patient_barcode)
+		data = casesGet(auth_service, case_barcode[args.program])
 		logTest(logfile, args.tier, "Patient Get Test", len(data['samples']))
 	except HttpError as exception:
 		logTest(logfile, args.tier, "Patients Get ERROR", exception)
@@ -292,7 +298,7 @@ def main(args):
 	#test samples().get()
 	vPrint(args.verbose, "samples().get() test")
 	try:
-		data = samplesGet(auth_service, sample_barcode)
+		data = samplesGet(auth_service, sample_barcode[args.program])
 		logTest(logfile, args.tier, "Sample Get Test", data['data_details_count'])
 	except HttpError as exception:
 		logTest(logfile, args.tier, "Samples Get ERROR", exception)
@@ -300,7 +306,7 @@ def main(args):
 	#test samples().cloud_storage_file_paths()
 	vPrint(args.verbose, "samples().cloud_storage_file_paths() test")
 	try:
-		data = samplesFiles(auth_service, sample_barcode)
+		data = samplesFiles(auth_service, sample_barcode[args.program])
 		logTest(logfile, args.tier, "Sample File Path Test", data['count'])
 	except HttpError as exception:
 		logTest(logfile, args.tier, "Sample File Path ERROR", exception)
@@ -318,25 +324,25 @@ def main(args):
 	if (args.program == "TCGA"):
 		
 		#Test Aliquot Annotation
-		vPrint(args.verbose, "aliquot_annotations() test")
+		vPrint(args.verbose, "aliquots().annotations() test")
 		try:
-			data = aliquotAnnotations(auth_service, tcga_aliquot_barcode)
+			data = aliquotAnnotations(auth_service, aliquot_barcode[args.program])
 			logTest(logfile, args.tier, "Aliquot Annotation Test", data['???????'])
 		except HttpError as exception:
 			logTest(logfile, args.tier, "Aliquot Annotation ERROR", exception)
 			
 		#Test Sample Annotation
-		vPrint(args.verbose, "sample_annotations() test")
+		vPrint(args.verbose, "samples().annotations() test")
 		try:
-			data = sampleAnnotations(auth_service, tcga_sample_barcode)
+			data = sampleAnnotations(auth_service, sample_barcode[args.program])
 			logTest(logfile, args.tier, "Sample Annotation Test", data['???????'])
 		except HttpError as exception:
 			logTest(logfile, args.tier, "Sample Annotation ERROR", exception)
 		
 		#Test Case Annotation
-		vPrint(args.verbose, "case_annotations() test")
+		vPrint(args.verbose, "cases().annotations() test")
 		try:
-			data = caseAnnotations(auth_service, tcga_case_barcode)
+			data = caseAnnotations(auth_service, case_barcode[args.program])
 			logTest(logfile, args.tier, "Case Annotation Test", data['???????'])
 		except HttpError as exception:
 			logTest(logfile, args.tier, "Case Annotation ERROR", exception)
