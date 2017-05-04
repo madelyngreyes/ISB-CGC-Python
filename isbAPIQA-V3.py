@@ -5,6 +5,9 @@
 # Much of the code is taken and/or adapted from:
 # https://github.com/isb-cgc/examples-Python/blob/master/python/isb_cgc_api_v2_cohorts.py
 #
+# Credential files can be generated using isb_auth.py -v -u -s credential_filename 
+# Paste the URL into a logged in browser window
+#
 #  API Repo: https://github.com/isb-cgc/ISB-CGC-API/tree/api_3/api_3
 #  Google API Explorer (MVM!!!):  https://apis-explorer.appspot.com/apis-explorer/?base=https://mvm-api-dot-isb-cgc.appspot.com/_ah/api#p/
 
@@ -75,15 +78,11 @@ def vPrint(doit, message):
 	if doit:
 		pprint.pprint(message)
 
-def logTest(filehandle, tier, testname, result):
+def logTest(filehandle, program, tier, testname, result):
 	now = datetime.datetime.now()
 	timestamp = "%s-%s-%s_%s:%s:%s" % (now.month, now.day, now.year, now.hour, now.minute, now.second)
-	filehandle.write(("%s\t%s\t%s\t%s\n") % (timestamp, tier, testname, result))
+	filehandle.write(("%s\t%s\t%s\t%s\t%s\n") % (timestamp, program, tier, testname, result))
 	
-def logError(e, message, logfile, tier):
-	error = json.loads(e.content)
-	errorstring =  "%s:\t%s:\t%s\n" % (message, error.get('code'), error.get('errors'))
-	logTest(logfile, tier, message, errorstring)
 		
 # Cohort testing
 def cohortsList(service):
@@ -93,9 +92,9 @@ def cohortsList(service):
 	except HttpError as exception:
 		raise exception
 
-def cohortsFiles(service, cohort_id):
+def cohortsFiles(service, cohort_id, limit):
 	try:
-		data = service.cohorts().cloud_storage_file_paths(cohort_id=cohort_id).execute()
+		data = service.cohorts().cloud_storage_file_paths(cohort_id=cohort_id, limit=limit).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -186,8 +185,8 @@ def main(args):
 	
 	#Create the log file
 	now = datetime.datetime.now()
-	filename = "%s_%s_%s_%s_%s_ISB-CGG-API_Testing_Log.tsv" % ( now.month, now.day, now.year, args.program, args.tier)
-	log_header = "Timestamp\tTest Tier\tTest Name\tResult Count\n"
+	filename = "%s_%s_%s_ISB-CGG-API_Testing_Log.tsv" % ( now.month, now.day, now.year)
+	log_header = "Timestamp\tTest Program\tTest Tier\tTest Name\tResult Count\n"
 	
 	if os.path.isfile(filename):
 		logfile = open(filename, "a")
@@ -200,11 +199,10 @@ def main(args):
 	program_api = getProgram(args.program)
 	site = getSite(args.tier)
 	cohort_id = '1' #Seems like a reasonable default but will get a real one below
-	#preview_request = {"Study" : ["BRCA", "UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}
 	preview_request = {
-		'TCGA' : '{"project_short_name" : ["BRCA", "UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}',
-		'TARGET' : '{"project_short_name" : ["AML", "WT"], "age_at_diagnosis_gte": 7}',
-		'CCLE' : '{"project_short_name" : ["COAD", "READ"], "gender": "M"}'
+		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_initial_pathologic_diagnosis": 90}',
+		'TARGET' : '{"project_short_name" : ["TARGET-AML", "TARGET-WT"], "age_at_diagnosis": 7}',
+		'CCLE' : '{"project_short_name" : ["CCLE-COAD", "CCLE-READ"], "gender": "M"}'
 		}
 	case_barcode = {'TCGA' : 'TCGA-DJ-A3US', 'TARGET' : 'TARGET-20-PABLDZ', 'CCLE' : 'FU-OV-1'}
 	sample_barcode = {'TCGA' : 'TCGA-DJ-A3US-10A', 'TARGET' : 'TARGET-20-PABLDZ-04A', 'CCLE' : 'CCLE-FU-OV-1'}
@@ -212,6 +210,7 @@ def main(args):
 	
 	cohort_name = "%s_%s_%s_%s_API_Testing_Cohort" % (now.month, now.day, now.year, args.program)
 	testing_cohort_id = None
+	recordlimit = 10
 	
 
 	#Get credentials
@@ -235,53 +234,53 @@ def main(args):
 		data = cohortsList(auth_service)
 		if data['count'] > 0:
 			cohort_id = data['items'][0]['id']
-		logTest(logfile,args.tier,"Cohorts List Test",data['count'])
+		logTest(logfile,args.program, args.tier,"Cohorts List Test","Number of cohorts found: " + str(data['count']))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Cohorts List ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Cohorts List ERROR", exception)
 		
 	#Test cohorts().cloud_storage_file_paths()
 	vPrint(args.verbose, "cohorts().cloud_storage_file_paths() test")
 	try:
-		data = cohortsFiles(auth_service, cohort_id)
-		logTest(logfile,args.tier,"Cohorts Storage File Paths",data['count'])
+		data = cohortsFiles(auth_service, cohort_id, recordlimit)
+		logTest(logfile,args.program, args.tier,"Cohorts Storage File Paths", "Number of cohort files found: " + str(data['count']))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Cohorts Cloud Storage File Paths ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths ERROR", exception)
 	
 	#test cohorts().preview()
 	vPrint(args.verbose, "cohorts().preview() test")
 	try:
 		data = cohortsPreview(auth_service, json.loads(preview_request[args.program]))
-		logTest(logfile, args.tier, "Cohorts Preview Test", data['patient_count'])
+		logTest(logfile, args.program, args.tier, "Cohorts Preview Test", "Cohort case count: " + str(data['case_count']))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Cohorts Preview ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Cohorts Preview ERROR", exception)
 	
 	#test cohorts().get()
 	vPrint(args.verbose, "cohorts().get() test")
 	try:
 		data = cohortsGet(auth_service, cohort_id)
-		logTest(logfile, args.tier, "Cohorts Get Test", data['patient_count'])
+		logTest(logfile, args.program, args.tier, "Cohorts Get Test", "Cohort sample count: " + str(data['sample_count']))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Cohorts Get ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Cohorts Get ERROR", exception)
 		
 	#test cohorts().create()
 	vPrint(args.verbose, "cohorts().create() test")
 	try:
-		data = cohortsCreate(auth_service, cohort_name, json.loads(preview_request)
+		data = cohortsCreate(auth_service, cohort_name, json.loads(preview_request[args.program]))
 		testing_cohort_id = data['id']  #will be used to delete in the next test
-		logTest(logfile,args.tier,"Cohorts Create Test", testing_cohort_id)
+		logTest(logfile,args.program, args.tier,"Cohorts Create Test", "Successfully created cohort " + testing_cohort_id)
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Cohorts Create ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Cohorts Create ERROR", exception)
 		
 	#test cohorts().delete()
 	vPrint(args.verbose, "cohorts().delete() test")
 	if testing_cohort_id is not None:
 		try:
 			data = cohortsDelete(auth_service, testing_cohort_id)
-			logTest(logfile, args.tier, "Cohorts Delete Test", data['message'])
+			logTest(logfile, args.program, args.tier, "Cohorts Delete Test", data['message'])
 		except HttpError as exception:
-			logTest(logfile, args.tier, "Cohorts Delete ERROR", exception)
+			logTest(logfile, args.program, args.tier, "Cohorts Delete ERROR", exception)
 	else:
-		logTest(logfile,args.tier, "Cohorts Delete Test", "Not performed because of no testing cohort ID")
+		logTest(logfile,args.program, args.tier, "Cohorts Delete Test", "Not performed because of no testing cohort ID")
 	
 	#Test Patient endpoints
 	
@@ -289,36 +288,36 @@ def main(args):
 	vPrint(args.verbose, "cases().get() test")
 	try:
 		data = casesGet(auth_service, case_barcode[args.program])
-		logTest(logfile, args.tier, "Patient Get Test", len(data['samples']))
+		logTest(logfile, args.program, args.tier, "Patient Get Test", "Number of samples for case: " + str(len(data['samples'])))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Patients Get ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Patients Get ERROR", exception)
 	
 	#Test Sample Endpoints
 	
 	#test samples().get()
 	vPrint(args.verbose, "samples().get() test")
-	try:
+	try: 
 		data = samplesGet(auth_service, sample_barcode[args.program])
-		logTest(logfile, args.tier, "Sample Get Test", data['data_details_count'])
+		logTest(logfile, args.program, args.tier, "Sample Get Test", "Number of sample detail sections: " + str(data['data_details_count']))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Samples Get ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Samples Get ERROR", exception)
 	
 	#test samples().cloud_storage_file_paths()
 	vPrint(args.verbose, "samples().cloud_storage_file_paths() test")
 	try:
 		data = samplesFiles(auth_service, sample_barcode[args.program])
-		logTest(logfile, args.tier, "Sample File Path Test", data['count'])
+		logTest(logfile, args.program, args.tier, "Sample File Path Test", "Number of files for sample: " + str(data['count']))
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Sample File Path ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Sample File Path ERROR", exception)
 	
 	#Test User Endpoint
 	
 	vPrint(args.verbose, "users().get() test")
 	try:
 		data = usersGet(auth_service)
-		logTest(logfile, args.tier, "Users Get Test", data['message'])
+		logTest(logfile, args.program, args.tier, "Users Get Test", data['message'])
 	except HttpError as exception:
-		logTest(logfile, args.tier, "Users Get ERROR", exception)
+		logTest(logfile, args.program, args.tier, "Users Get ERROR", exception)
 	
 	#Check the annotations endpoints only if testing TCGA
 	if (args.program == "TCGA"):
@@ -327,25 +326,25 @@ def main(args):
 		vPrint(args.verbose, "aliquots().annotations() test")
 		try:
 			data = aliquotAnnotations(auth_service, aliquot_barcode[args.program])
-			logTest(logfile, args.tier, "Aliquot Annotation Test", data['???????'])
+			logTest(logfile, args.program, args.tier, "Aliquot Annotation Test", "Number of aliquot annotations: " + str(data['count']))
 		except HttpError as exception:
-			logTest(logfile, args.tier, "Aliquot Annotation ERROR", exception)
+			logTest(logfile, args.program, args.tier, "Aliquot Annotation ERROR", exception)
 			
 		#Test Sample Annotation
 		vPrint(args.verbose, "samples().annotations() test")
 		try:
 			data = sampleAnnotations(auth_service, sample_barcode[args.program])
-			logTest(logfile, args.tier, "Sample Annotation Test", data['???????'])
+			logTest(logfile, args.program, args.tier, "Sample Annotation Test", "Number of sample annotations: " + str(data['count']))
 		except HttpError as exception:
-			logTest(logfile, args.tier, "Sample Annotation ERROR", exception)
+			logTest(logfile, args.program, args.tier, "Sample Annotation ERROR", exception)
 		
 		#Test Case Annotation
 		vPrint(args.verbose, "cases().annotations() test")
 		try:
 			data = caseAnnotations(auth_service, case_barcode[args.program])
-			logTest(logfile, args.tier, "Case Annotation Test", data['???????'])
+			logTest(logfile, args.program, args.tier, "Case Annotation Test", "Number of case annotations: " + str(data['count']))
 		except HttpError as exception:
-			logTest(logfile, args.tier, "Case Annotation ERROR", exception)
+			logTest(logfile, args.program, args.tier, "Case Annotation ERROR", exception)
 
 
 	logfile.close()
