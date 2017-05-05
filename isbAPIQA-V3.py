@@ -10,6 +10,12 @@
 #
 #  API Repo: https://github.com/isb-cgc/ISB-CGC-API/tree/api_3/api_3
 #  Google API Explorer (MVM!!!):  https://apis-explorer.appspot.com/apis-explorer/?base=https://mvm-api-dot-isb-cgc.appspot.com/_ah/api#p/
+#
+# For testing TARGET and CCLE on the different tiers, you need to first create cohorts with specific names.  TCGA has a universally shared cohort
+# TARGET - "All TARGET for testing"
+# CCLE - "All TARGET for testing"
+# TCGA - "All TCGA Data"
+#
 
 
 import argparse
@@ -94,7 +100,10 @@ def cohortsList(service):
 
 def cohortsFiles(service, cohort_id, limit):
 	try:
-		data = service.cohorts().cloud_storage_file_paths(cohort_id=cohort_id, limit=limit).execute()
+		if limit == 0:
+			data = service.cohorts().cloud_storage_file_paths(cohort_id=cohort_id).execute()
+		else:
+			data = service.cohorts().cloud_storage_file_paths(cohort_id=cohort_id, limit=limit).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -179,7 +188,20 @@ def caseAnnotations(service,barcode):
 		return data
 	except HttpError as exception:
 		raise exception
-		
+
+def getCohortIDs(cohortlist):
+	tcgacohort = 'All TCGA Data'
+	targetcohort = 'All TARGET for testing'
+	cclecohort = 'All CCLE for testing'
+	cohortdictionary = {}
+	for cohort in cohortlist['items']:
+		if cohort['name'] == tcgacohort:
+			cohortdictionary['TCGA'] = cohort['id']
+		elif cohort['name'] == targetcohort:
+			cohortdictionary['TARGET'] = cohort['id']
+		elif cohort['name'] == cclecohort:
+			cohortdictionary['CCLE'] = cohort['id']
+	return cohortdictionary
 	
 def main(args):
 	
@@ -198,10 +220,10 @@ def main(args):
 	version = "v3"
 	program_api = getProgram(args.program)
 	site = getSite(args.tier)
-	cohort_id = '1' #Seems like a reasonable default but will get a real one below
+	
 	preview_request = {
-		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_initial_pathologic_diagnosis": 90}',
-		'TARGET' : '{"project_short_name" : ["TARGET-AML", "TARGET-WT"], "age_at_diagnosis": 7}',
+		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}',
+		'TARGET' : '{"project_short_name" : ["TARGET-AML", "TARGET-WT"], "age_at_diagnosis_gte": 7}',
 		'CCLE' : '{"project_short_name" : ["CCLE-COAD", "CCLE-READ"], "gender": "M"}'
 		}
 	case_barcode = {'TCGA' : 'TCGA-DJ-A3US', 'TARGET' : 'TARGET-20-PABLDZ', 'CCLE' : 'FU-OV-1'}
@@ -210,7 +232,7 @@ def main(args):
 	
 	cohort_name = "%s_%s_%s_%s_API_Testing_Cohort" % (now.month, now.day, now.year, args.program)
 	testing_cohort_id = None
-	recordlimit = 10
+	recordlimit = 0
 	
 
 	#Get credentials
@@ -232,8 +254,9 @@ def main(args):
 	vPrint(args.verbose, "cohorts().list() test")
 	try:
 		data = cohortsList(auth_service)
-		if data['count'] > 0:
-			cohort_id = data['items'][0]['id']
+		cohort_id_set = getCohortIDs(data)
+		cohort_id = cohort_id_set[args.program]
+		vPrint(args.verbose, ("Program:\t%s\tCohort ID:\t%s" % (args.program, cohort_id)))
 		logTest(logfile,args.program, args.tier,"Cohorts List Test","Number of cohorts found: " + str(data['count']))
 	except HttpError as exception:
 		logTest(logfile, args.program, args.tier, "Cohorts List ERROR", exception)
@@ -242,7 +265,7 @@ def main(args):
 	vPrint(args.verbose, "cohorts().cloud_storage_file_paths() test")
 	try:
 		data = cohortsFiles(auth_service, cohort_id, recordlimit)
-		logTest(logfile,args.program, args.tier,"Cohorts Storage File Paths", "Number of cohort files found: " + str(data['count']))
+		logTest(logfile,args.program, args.tier,"Cohorts Storage File Paths", "Number of cohort files found: " + str(data['count']) + " for cohort " + cohort_id)
 	except HttpError as exception:
 		logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths ERROR", exception)
 	
