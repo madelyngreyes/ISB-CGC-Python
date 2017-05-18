@@ -13,7 +13,7 @@
 #
 # For testing TARGET and CCLE on the different tiers, you need to first create cohorts with specific names.  TCGA has a universally shared cohort
 # TARGET - "All TARGET for testing"
-# CCLE - "All TARGET for testing"
+# CCLE - "All CCLE for testing"
 # TCGA - "All TCGA Data"
 #
 
