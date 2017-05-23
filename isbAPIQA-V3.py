@@ -237,7 +237,7 @@ def main(args):
 	site = getSite(args.tier)
 	
 	preview_request = {
-		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}',
+		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_diagnosis_gte": 90}',
 		'TARGET' : '{"project_short_name" : ["TARGET-AML", "TARGET-WT"], "age_at_diagnosis_gte": 7}',
 		'CCLE' : '{"project_short_name" : ["CCLE-COAD", "CCLE-READ"], "gender": "Male"}'
 		}
