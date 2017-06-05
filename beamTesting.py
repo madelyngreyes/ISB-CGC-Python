@@ -2,6 +2,9 @@
 #https://github.com/apache/beam/tree/master/sdks/python
 
 import apache_beam as beam
+from apache_beam.utils.pipeline_options import PipelineOptions
+from apache_beam.utils.pipeline_options import GoogleCloudOptions
+from apache_beam.utils.pipeline_options import StandardOptions
 import os
 import time
 
@@ -14,16 +17,26 @@ directory = "."
 
 
 def runQuery():
-	input_query = 'SELECT annotation_gdc_id, category, classification, status, entity_type, project_short_name, entity_barcode ' \
-		'FROM `isb-cgc.test.TCGA_Annotation` ' \
-		'WHERE classification = \'Observation\' ' \
-		'LIMIT 10'
+	#https://beam.apache.org/get-started/wordcount-example/
+	#input_query = 'SELECT annotation_gdc_id, category, classification, status, entity_type, project_short_name, entity_barcode ' \
+	#	'FROM `isb-cgc.test.TCGA_Annotation` ' \
+	#	'WHERE classification = \'Observation\' ' \
+	#	'LIMIT 10'
 	
-	p = beam.Pipeline(argv=['--project', project])
-	(p 
-		| 'read' >> beam.Read(beam.io.BigQuerySource(query=input_query)) 
-		| 'save' >> beam.Write(beam.io.WriteToText('./beam_test.txt')))
-	p.run()
+	#options = PipelineOptions()
+	#google_cloud_options = options.view_as(GoogleCloudOptions)
+	#google_cloud_options.project = project
+	#google_cloud_options.temp_location = "gs://tdp-test/beam-test"
+	#options.view_as(StandardOptions).runner = 'DataflowRunner'
+	#p = beam.Pipeline(options=options)
+	
+	#print "Running pipeline"
+	#p = beam.Pipeline(argv=['--project', project])
+	#(p 
+	#	| 'read' >> beam.Read(beam.io.BigQuerySource(query=input_query)) 
+	#	| 'save' >> beam.Write(beam.io.WriteToText('./beam_test.txt')))
+	#p.run()
+	 
 	 
 def beamBasic():
 	p = beam.Pipeline('DirectRunner')
@@ -77,17 +90,17 @@ def complexFlatMap():
 			
 def main():
 	#runQuery()
-	print "Running beamBasic"
-	beamBasic()
+	#print "Running beamBasic"
+	#beamBasic()
 	#Need to sleep otherwise beamMap reads temporary files and blows up
-	time.sleep(1)
-	print "Running beamMap"
-	beamMap()
-	time.sleep(1)
-	print "Running basicFlatMap"
-	basicFlatmap()
-	print "Running complexFlatMap"
-	complexFlatMap()
+	#time.sleep(1)
+	#print "Running beamMap"
+	#beamMap()
+	#time.sleep(1)
+	#print "Running basicFlatMap"
+	#basicFlatmap()
+	#print "Running complexFlatMap"
+	#complexFlatMap()
 	print "Runninq BQ query"
 	runQuery()
 	
