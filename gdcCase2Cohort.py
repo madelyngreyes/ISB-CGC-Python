@@ -1,5 +1,31 @@
-#!/usr/bin/python
-#Create ISB-CGC cohorts from a GDC Case file
+#!/usr/bin/env python
+'''
+Copyright 2017, Institute for Systems Biology.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
+Create ISB-CGC cohorts from a GDC Case JSON file
+
+From the command line use the following options:
+
+  -c/--credentialsfile <Google credentials file>    OPTIONAL: This defaults to the .isb_credentials file in the user's home directory.  If one
+													does not exist, it will be created even if this option is not used.
+													
+  -i/--inputfile <GDC case JSON file>				REQUIRED:  This is the JSON file obtained from the GDC that will be parsed to obtain the
+													case IDs.
+													
+  -n/--cohortname									REQUIRED: This is the name that will be assigned to the cohort.  While this has no impact on
+													cohort creation, it should be descriptive enough to be useful.
+
+'''
 
 from oauth2client.client import OAuth2WebServerFlow
 from oauth2client import tools
@@ -88,7 +114,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-c", "--credentialsfile", nargs = '?', const = None , help="File to use for credentials, will default to ~/.isb_credentials if left blank")
 	parser.add_argument("-i", "--inputfile", required = True, help = "GDC Case JSON file")
-	parser.add_argument("-n", "--cohortname", nargs = '?', const = None, help = "Provide a name for the cohort")
+	parser.add_argument("-n", "--cohortname", nargs = '?', const = None, required = True, help = "Provide a name for the cohort")
 	args = parser.parse_args()
 
 	main(args)
