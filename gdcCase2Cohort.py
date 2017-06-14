@@ -17,13 +17,13 @@ Create ISB-CGC cohorts from a GDC Case JSON file
 From the command line use the following options:
 
   -c/--credentialsfile <Google credentials file>    OPTIONAL: This defaults to the .isb_credentials file in the user's home directory.  If one
-													does not exist, it will be created even if this option is not used.
+						     does not exist, it will be created even if this option is not used.
 													
-  -i/--inputfile <GDC case JSON file>				REQUIRED:  This is the JSON file obtained from the GDC that will be parsed to obtain the
-													case IDs.
+  -i/--inputfile <GDC case JSON file>		     REQUIRED:  This is the JSON file obtained from the GDC that will be parsed to obtain the
+								case IDs.
 													
-  -n/--cohortname									REQUIRED: This is the name that will be assigned to the cohort.  While this has no impact on
-													cohort creation, it should be descriptive enough to be useful.
+  -n/--cohortname				     REQUIRED: This is the name that will be assigned to the cohort.  
+  							While this has no impact on cohort creation, it should be descriptive enough to be useful.
 
 '''
 
