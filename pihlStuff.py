@@ -91,6 +91,7 @@ def getProgram(program):
 	programs = {
 			"TCGA" : "isb_cgc_tcga_api",
 			"TARGET" : "isb_cgc_target_api",
-			"CCLE" : "isb_cgc_ccle_api"
+			"CCLE" : "isb_cgc_ccle_api",
+			"COMMON" : "isb_cgc_api"
 			}
 	return programs[program]
