@@ -4,7 +4,9 @@ Copyright 2017, Institute for Systems Biology.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
 http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -86,12 +88,20 @@ def cohortsCreate(service, name, body):
 		return data
 	except HttpError as exception:
 		raise exception
+		
+def getSite(tier):
+	sites = {"mvm" : "https://mvm-api-dot-isb-cgc.appspot.com",
+			"dev" : "https://mvm-api-dot-isb-cgc.appspot.com",
+			"test" : "https://api-dot-isb-cgc-test.appspot.com",
+			"prod" : "https://api-dot-isb-cgc.appspot.com" }
+	return sites[tier]
     
 def main(args):
 	#Main variables
 	api = "isb_cgc_tcga_api"
 	version = "v3"
-	site = "https://api-dot-isb-cgc.appspot.com"
+	#site = "https://api-dot-isb-cgc.appspot.com"
+	site = getSite(args.tier)
 	
 	#Set up credentials and API service
 	credentials = get_credentials(args.credentialsfile)
@@ -115,6 +125,8 @@ if __name__ == "__main__":
 	parser.add_argument("-c", "--credentialsfile", nargs = '?', const = None , help="File to use for credentials, will default to ~/.isb_credentials if left blank")
 	parser.add_argument("-i", "--inputfile", required = True, help = "GDC Case JSON file")
 	parser.add_argument("-n", "--cohortname", nargs = '?', const = None, required = True, help = "Provide a name for the cohort")
+	tierchoice = ["mvm", "dev", "test", "prod"]
+	parser.add_argument("-t", "--tier", required = True, type = str.lower, choices = tierchoice, help = "Tier that the tests will be run on")
 	args = parser.parse_args()
 
 	main(args)
