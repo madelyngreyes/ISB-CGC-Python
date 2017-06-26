@@ -10,18 +10,23 @@ import json
 from googleapiclient.errors import HttpError
 
 #app = dash.Dash()
-
 '''
-app.layout = html.Div(children = [
-	html.H1(children='Available Cohorts'),
-	html.Select(children = [
+	app.layout = html.Div(children = [
+		html.H1(children='Available Cohorts'),
+        html.Select(children = [
 		html.Option(children = 'One'),
 		html.Option(children = 'Two'),
 		html.Option(children = 'Three')
 	])
-]
-)
+	]
+	)
 '''
+
+def selectLayout(cohortList):
+ return html.Select(children = [
+			html.Option(children = cohort) for cohort in cohortList
+	])
+
 def cohortsList(service):
 	try:
 		data = service.cohorts().list().execute()
@@ -45,9 +50,15 @@ def main():
 		
 	for cohort in data['items']:
 		cohort_names.append(cohort['name'])
+		
+	app = dash.Dash()
+	app.layout = html.Div(children = [
+	    html.H1(children='Available Cohorts'),
+	    selectLayout(cohort_names)
+	  ]
+	)
 	
-	print cohort_names
-	
+	app.run_server(debug=True)
 
 if __name__ == '__main__':
     #app.run_server(debug=True)
