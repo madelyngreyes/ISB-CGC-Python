@@ -14,16 +14,6 @@ import pandas as pd
 import pprint
 
 
-def selectLayout(cohortList):
- return html.Select(children = [
-			html.Option(children = cohort) for cohort in cohortList
-	])
-	
-def markdownLayout(cohortList):
-	return dcc.Dropdown(id = 'cohort-dropdown', options = [
-		{'label' : cohort, 'value' : cohort } for cohort in cohortList
-	])
-
 def markdownDataframe(df):
 	return dcc.Dropdown( id = 'cohort-dropdown', options = [	
 		{'label' : index, 'value' : index } for (index, row) in df.iterrows()
@@ -48,7 +38,6 @@ def json2df(jsondata):
 	return df.set_index('name')
 
 
-cohort_names = []
 credentials = pihl.get_credentials(None, 'prod',False)
 endpoint = pihl.getProgram("COMMON")
 site = pihl.getSite("prod")
@@ -61,13 +50,11 @@ except HttpError as exception:
 	print exception
 
 dataframe = json2df(data)
-#pprint.pprint(dataframe)
 		
 app = dash.Dash()
+
 app.layout = html.Div([
     html.H1('Available Cohorts'),
-    #selectLayout(cohort_names)
-    #markdownLayout(cohort_names)
     markdownDataframe(dataframe),
     dcc.Graph(id = 'case-graph')
   ]
@@ -80,7 +67,6 @@ dash.dependencies.Output('case-graph', 'figure'),
 def update_figure(selected_cohort):
 	case_count = dataframe.loc[selected_cohort, 'cases']
 	sample_count = dataframe.loc[selected_cohort,'samples']
-	print ("Case Count: %s\tSample Count: %s\n") % (case_count, sample_count)
 	
 	return {
 		'data' : [
@@ -94,7 +80,6 @@ def update_figure(selected_cohort):
 
 
 if __name__ == '__main__':
-    #main()
     app.run_server(debug=True)
 
 
