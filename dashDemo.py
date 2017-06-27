@@ -11,6 +11,7 @@ import httplib2
 import json
 from googleapiclient.errors import HttpError
 import pandas as pd
+import pprint
 
 
 def selectLayout(cohortList):
@@ -19,14 +20,15 @@ def selectLayout(cohortList):
 	])
 	
 def markdownLayout(cohortList):
-	return dcc.Dropdown( options = [
+	return dcc.Dropdown(id = 'cohort-dropdown', options = [
 		{'label' : cohort, 'value' : cohort } for cohort in cohortList
 	])
 
 def markdownDataframe(df):
-	return dcc.Dropdown( options = [
-		{'label' : row.loc['name'], 'value' : row.loc['name'] } for (index, row) in df.iterrows()
+	return dcc.Dropdown( id = 'cohort-dropdown', options = [	
+		{'label' : index, 'value' : index } for (index, row) in df.iterrows()
 	])
+
 		
 def cohortsList(service):
 	try:
@@ -38,47 +40,61 @@ def cohortsList(service):
 def json2df(jsondata):
 	columns = ['name', 'cases', 'samples']
 	count = jsondata['count']
-	#df = pd.DataFrame(columns = columns, index = count)
 	tabledata = []
 	for cohort in jsondata['items']:
 		temp = [cohort['name'], cohort['case_count'], cohort['sample_count']]
 		tabledata.append(temp)
 	df = pd.DataFrame(tabledata, columns=columns)
-	return df	
-	
-		
+	return df.set_index('name')
 
-def main():
-	cohort_names = []
-	credentials = pihl.get_credentials(None, 'prod',False)
-	endpoint = pihl.getProgram("COMMON")
-	site = pihl.getSite("prod")
-	version = "v3"
-	service = pihl.get_authorized_service(endpoint, version, site, credentials, False)
-	
-	try:
-		data = cohortsList(service)
-	except HttpError as exception:
-		print exception
-	
-	dataframe = json2df(data)
 
+cohort_names = []
+credentials = pihl.get_credentials(None, 'prod',False)
+endpoint = pihl.getProgram("COMMON")
+site = pihl.getSite("prod")
+version = "v3"
+service = pihl.get_authorized_service(endpoint, version, site, credentials, False)
+
+try:
+	data = cohortsList(service)
+except HttpError as exception:
+	print exception
+
+dataframe = json2df(data)
+#pprint.pprint(dataframe)
 		
-	#for cohort in data['items']:
-	#	cohort_names.append(cohort['name'])
-		
-	app = dash.Dash()
-	app.layout = html.Div(children = [
-	    html.H1(children='Available Cohorts'),
-	    #selectLayout(cohort_names)
-	    #markdownLayout(cohort_names)
-	    markdownDataframe(dataframe)
-	  ]
-	)
+app = dash.Dash()
+app.layout = html.Div([
+    html.H1('Available Cohorts'),
+    #selectLayout(cohort_names)
+    #markdownLayout(cohort_names)
+    markdownDataframe(dataframe),
+    dcc.Graph(id = 'case-graph')
+  ]
+)
 	
-	app.run_server(debug=True)
+@app.callback(
+dash.dependencies.Output('case-graph', 'figure'),
+[dash.dependencies.Input('cohort-dropdown', 'value')]
+)
+def update_figure(selected_cohort):
+	case_count = dataframe.loc[selected_cohort, 'cases']
+	sample_count = dataframe.loc[selected_cohort,'samples']
+	print ("Case Count: %s\tSample Count: %s\n") % (case_count, sample_count)
+	
+	return {
+		'data' : [
+			{ 'x' : [1], 'y' :[case_count], 'type' : 'bar', 'name' : 'Cases' },
+			{'x' : [1], 'y' : [sample_count], 'type' : 'bar', 'name' : 'Samples'}
+		],
+		'layout' : {'title' : 'Cases and Samples'}
+	}
+	
+
+
 
 if __name__ == '__main__':
-    main()
+    #main()
+    app.run_server(debug=True)
 
 
