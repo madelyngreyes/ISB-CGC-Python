@@ -13,33 +13,56 @@ from google.cloud import bigquery
 
 DEFAULT_PROJECT = 'cgc-05-0016'
 
+def runSyncQuery(query, parameters, project):
+	bq = bigquery.Client(project=project)
+	if parameters is not None:
+		query_results = bq.run_sync_query(query, query_parameters = parameters)
+	else:
+		query_results = bq.run_sync_query(query)
+	query_results.use_legacy_sql = False
+	query_results.run()
+	rows = query_results.fetch_data()
+	return rows
+	
 def getProjects():
-	client = bigquery.Client()
 	query = ("""
 		select project_short_name
 		from `isb-cgc.TCGA_bioclin_v0.Clinical` 
 		GROUP BY project_short_name
+		ORDER BY project_short_name ASC
 	""")
+	rows = runSyncQuery(query, None, DEFAULT_PROJECT)
+	return rows
 	
-	results = client.run_sync_query(query)
-	results.use_legacy_sql = False
-	results.run()
-	rows = results.fetch_data()
+def getPathways():
+	query = ("""
+		select pathway
+		from `isb-cgc.QotM.WikiPathways_20170425_Annotated` 
+		group by pathway
+		ORDER BY pathway ASC
+	""")
+	rows = runSyncQuery(query, None, DEFAULT_PROJECT)
 	return rows
 
 def projectDropdown(projects):
-	return dcc.Dropdown( id = 'project-dropdown', options = [	
-		{'label' : project, 'value' : project } for project in projects
+	return dcc.Dropdown( id = 'project-dropdown', 
+						options = [	
+						{'label' : project, 'value' : project } for project in projects
+						], 
+						value = 'TCGA-ACC')
+
+def pathwayDropdown(pathways):
+	return dcc.Dropdown( id = 'pathway-dropdown', options = [
+		{'label': pathway, 'value' : pathway } for pathway in pathways
 	])
 
-def getGenes(project):
-	client = bigquery.Client()
+def getGenes(project, pathway):
 	query = ("""
 		WITH 
 		pathGenes AS (
 			SELECT Symbol
 			FROM `isb-cgc.QotM.WikiPathways_20170425_Annotated`
-			WHERE pathway = 'Notch Signaling Pathway'
+			WHERE pathway = @pathway
 			GROUP BY Symbol
 		),
 		varsMC3 AS (
@@ -63,12 +86,12 @@ def getGenes(project):
 		GROUP BY Hugo_Symbol
 		ORDER BY
 		gene_count DESC	
+		LIMIT 10
 	""")
-	query_parameters = ( bigquery.ScalarQueryParameter('project', 'STRING', project))
-	results = client.run_sync_query(query, query_parameters = [query_parameters])
-	results.use_legacy_sql = False
-	results.run()
-	rows = results.fetch_data()
+	query_parameters = ( bigquery.ScalarQueryParameter('project', 'STRING', project),
+						bigquery.ScalarQueryParameter('pathway', 'STRING', pathway)
+						)
+	rows = runSyncQuery(query, query_parameters, DEFAULT_PROJECT)
 	return rows
 
 ###Main Section######
@@ -76,21 +99,26 @@ app = dash.Dash()
 
 
 projects = getProjects()
+pathways = getPathways()
 
 app.layout = html.Div([
     html.H1('Available Projects'),
     projectDropdown(projects),
-    dcc.Graph(id = 'gene-mutations')
+    html.H1('Available Pathways'),
+    pathwayDropdown(pathways),
+    html.Div([
+		dcc.Graph(id = 'gene-mutations')
+		])
   ]
 )
 
 @app.callback(
 dash.dependencies.Output('gene-mutations', 'figure'),
-[dash.dependencies.Input('project-dropdown', 'value')]
+[dash.dependencies.Input('project-dropdown', 'value'),
+dash.dependencies.Input('pathway-dropdown', 'value')]
 )
-
-def update_figure(selected_project):
-	rows = getGenes(selected_project)
+def update_figure(selected_project, selected_pathway):
+	rows = getGenes(selected_project, selected_pathway)
 	return {
 		'data' : [{'x' : [symbol], 'y' : [count], 'type' : 'bar', 'name' : selected_project } for (symbol,count) in rows]
 	}
