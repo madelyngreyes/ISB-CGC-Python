@@ -25,6 +25,7 @@ def runSyncQuery(query, parameters, project):
 	return rows
 	
 def getProjects():
+	rows = []
 	query = ("""
 		select project_short_name
 		from `isb-cgc.TCGA_bioclin_v0.Clinical` 
@@ -35,6 +36,7 @@ def getProjects():
 	return rows
 	
 def getPathways():
+	rows = []
 	query = ("""
 		select pathway
 		from `isb-cgc.QotM.WikiPathways_20170425_Annotated` 
@@ -49,12 +51,14 @@ def projectDropdown(projects):
 						options = [	
 						{'label' : project, 'value' : project } for project in projects
 						], 
-						value = 'TCGA-ACC')
+						value = projects[0])
 
 def pathwayDropdown(pathways):
-	return dcc.Dropdown( id = 'pathway-dropdown', options = [
-		{'label': pathway, 'value' : pathway } for pathway in pathways
-	])
+	return dcc.Dropdown( id = 'pathway-dropdown', 
+						options = [
+						{'label': pathway, 'value' : pathway } for pathway in pathways
+						],
+						value = pathways[0])
 
 def getGenes(project, pathway):
 	query = ("""
@@ -98,14 +102,24 @@ def getGenes(project, pathway):
 app = dash.Dash()
 
 
-projects = getProjects()
-pathways = getPathways()
+tempprojects = getProjects()
+#rows returned from a query aren't dictionaries, so they need to be converted
+projects = []
+for project in tempprojects:
+	projects.append(project)
+	
+temppathways = getPathways()
+pathways = []
+for pathway in temppathways:
+	pathways.append(pathway)
 
 app.layout = html.Div([
-    html.H1('Available Projects'),
-    projectDropdown(projects),
-    html.H1('Available Pathways'),
-    pathwayDropdown(pathways),
+	html.Div([
+		html.P('Available Projects'),
+		projectDropdown(projects),
+		html.P('Available Pathways'),
+		pathwayDropdown(pathways)
+	]),
     html.Div([
 		dcc.Graph(id = 'gene-mutations')
 		])
