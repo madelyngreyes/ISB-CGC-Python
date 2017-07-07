@@ -39,30 +39,40 @@ import argparse
 import httplib2
 import json
 
-# the CLIENT_ID for the ISB-CGC site
-CLIENT_ID = '907668440978-0ol0griu70qkeb6k3gnn2vipfa5mgl60.apps.googleusercontent.com'
-# The google-specified 'installed application' OAuth pattern
-CLIENT_SECRET = 'To_WJH7-1V-TofhNGcEqmEYi'
 # The google defined scope for authorization
 EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
 # where a default credentials file will be stored for use by the endpoints
 DEFAULT_STORAGE_FILE = os.path.join(os.path.expanduser("~"), '.isb_credentials')
 
 
-def get_credentials(credFile):
+def get_credentials(credFile, tier, verbose):
 	oauth_flow_args = ['--noauth_local_webserver']
 	if credFile is None:
 		storage = Storage(DEFAULT_STORAGE_FILE)
 	else:
 		storage = Storage(credFile)
-		
 	credentials = storage.get()
+	
+	client_id = {
+		'mvm' : '907668440978-0ol0griu70qkeb6k3gnn2vipfa5mgl60.apps.googleusercontent.com',
+		'dev' : '907668440978-0ol0griu70qkeb6k3gnn2vipfa5mgl60.apps.googleusercontent.com',
+		'test' : '144657163696-9dnmed5krg4r00km2fg1q93l71nj3r9j.apps.googleusercontent.com',
+		'prod' : '907668440978-0ol0griu70qkeb6k3gnn2vipfa5mgl60.apps.googleusercontent.com'
+	}
+	
+	client_secret = {
+		'mvm' : 'To_WJH7-1V-TofhNGcEqmEYi',
+		'dev' : 'To_WJH7-1V-TofhNGcEqmEYi',
+		'test' : 'z27YV6Fd0HDKISkkHVoY1cTa',
+		'prod' : 'To_WJH7-1V-TofhNGcEqmEYi'
+	}
+	vPrint(verbose, ("ID: %s" % client_id[tier]))
+	vPrint(verbose, ("Secret: %s" % client_secret[tier]))
 	if not credentials or credentials.invalid:
-		flow = OAuth2WebServerFlow(CLIENT_ID, CLIENT_SECRET, EMAIL_SCOPE)
+		flow = OAuth2WebServerFlow(client_id[tier], client_secret[tier], EMAIL_SCOPE)
 		flow.auth_uri = flow.auth_uri.rstrip('/') + '?approval_prompt=force'
 		credentials = tools.run_flow(flow, storage, tools.argparser.parse_args(oauth_flow_args))
 	return credentials
-   
 
 def get_authorized_service(api, version, site, credentials):
     discovery_url = '%s/_ah/api/discovery/v1/apis/%s/%s/rest' % (site, api, version)
@@ -95,6 +105,11 @@ def getSite(tier):
 			"test" : "https://api-dot-isb-cgc-test.appspot.com",
 			"prod" : "https://api-dot-isb-cgc.appspot.com" }
 	return sites[tier]
+	
+#Print out any message if doit is True
+def vPrint(doit, message):
+	if doit:
+		pprint.pprint(message)
     
 def main(args):
 	#Main variables
@@ -104,7 +119,7 @@ def main(args):
 	site = getSite(args.tier)
 	
 	#Set up credentials and API service
-	credentials = get_credentials(args.credentialsfile)
+	credentials = get_credentials(args.credentialsfile, args.tier, args.verbose)
 	service = get_authorized_service(api, version, site, credentials)
 	
 	#Parse the case IDs from the GDC case file
@@ -127,6 +142,7 @@ if __name__ == "__main__":
 	parser.add_argument("-n", "--cohortname", nargs = '?', const = None, required = True, help = "Provide a name for the cohort")
 	tierchoice = ["mvm", "dev", "test", "prod"]
 	parser.add_argument("-t", "--tier", required = True, type = str.lower, choices = tierchoice, help = "Tier that the tests will be run on")
+	parser.add_argument("-v", "--verbose", action = "store_true", help = 'Enable verbose feedback.')
 	args = parser.parse_args()
 
 	main(args)
