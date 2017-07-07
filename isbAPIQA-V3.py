@@ -136,7 +136,6 @@ def cohortsGet(service, cohort_id):
 def cohortsCreate(service, name, body):
 	try:
 		data = service.cohorts().create(name=name, body=body).execute()
-		pprint.pprint(data)
 		return data
 	except HttpError as exception:
 		raise exception
