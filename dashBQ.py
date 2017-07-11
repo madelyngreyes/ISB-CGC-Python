@@ -24,6 +24,7 @@ def runSyncQuery(query, parameters, project):
 	rows = query_results.fetch_data()
 	return rows
 	
+
 def getProjects():
 	rows = []
 	query = ("""
@@ -46,19 +47,18 @@ def getPathways():
 	rows = runSyncQuery(query, None, DEFAULT_PROJECT)
 	return rows
 
+	
 def projectDropdown(projects):
 	return dcc.Dropdown( id = 'project-dropdown', 
 						options = [	
-						{'label' : project, 'value' : project } for project in projects
-						], 
-						value = projects[0])
+						{'label' : project[0], 'value' : project[0] } for project in projects
+						])
 
 def pathwayDropdown(pathways):
 	return dcc.Dropdown( id = 'pathway-dropdown', 
 						options = [
-						{'label': pathway, 'value' : pathway } for pathway in pathways
-						],
-						value = pathways[0])
+						{'label': pathway[0], 'value' : pathway[0] } for pathway in pathways
+						])
 
 def getGenes(project, pathway):
 	query = ("""
@@ -101,17 +101,8 @@ def getGenes(project, pathway):
 ###Main Section######
 app = dash.Dash()
 
-
-tempprojects = getProjects()
-#rows returned from a query aren't dictionaries, so they need to be converted
-projects = []
-for project in tempprojects:
-	projects.append(project)
-	
-temppathways = getPathways()
-pathways = []
-for pathway in temppathways:
-	pathways.append(pathway)
+projects = getProjects()
+pathways = getPathways()
 
 app.layout = html.Div([
 	html.Div([
@@ -126,6 +117,7 @@ app.layout = html.Div([
   ]
 )
 
+
 @app.callback(
 dash.dependencies.Output('gene-mutations', 'figure'),
 [dash.dependencies.Input('project-dropdown', 'value'),
@@ -136,5 +128,6 @@ def update_figure(selected_project, selected_pathway):
 	return {
 		'data' : [{'x' : [symbol], 'y' : [count], 'type' : 'bar', 'name' : selected_project } for (symbol,count) in rows]
 	}
+
 if __name__ == '__main__':
     app.run_server(debug=True)
