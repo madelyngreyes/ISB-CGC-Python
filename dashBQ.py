@@ -1,5 +1,6 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
+#Users need to run gcloud auth application-default login before this will work
 
 import dash
 import dash_core_components as dcc
