@@ -7,6 +7,8 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 
+from oauth2client.client import GoogleCredentials
+
 import pihlStuff as pihl
 
 
@@ -22,7 +24,7 @@ def runSyncQuery(query, parameters, project):
 	rows = query_results.fetch_data()
 	return rows
 	
-def getProjects(project):
+def getProjects():
 	rows = []
 	query = ("""
 		select project_short_name
@@ -78,7 +80,17 @@ dash.dependencies.Output(component_id = 'main_div',component_property = 'childre
 [dash.dependencies.Input("loginbutton","value")]
 )
 def doLogin(value):
-	pihl.get_credentials(None, "prod", True)
+	#pihl.get_credentials(None, "prod", True)
+	credentials = GoogleCredentials.get_application_default()
+	print credentials
+	
+@app.callback(
+dash.dependencies.Output(component_id = "project-dropdown", component_property = 'value'),
+[dash.dependencies.Input("loginbutton", "value")]
+)
+def doProjects(value):
+	projects = getProjects()
+	
 
 if __name__ == '__main__':
     app.run_server(debug=True)
