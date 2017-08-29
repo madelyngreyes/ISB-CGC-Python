@@ -1,19 +1,24 @@
 #!/usr/bin/env python
 # A Python/Dash version of David Gibb's August Query of the Month
 # http://isb-cancer-genomics-cloud.readthedocs.io/en/latest/sections/QueryOfTheMonthClub.html
+# https://github.com/plotly/dash-recipes
+
 
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, Event, State
 
 from oauth2client.client import GoogleCredentials
-
-import pihlStuff as pihl
-
+from google.cloud import bigquery
+import pandas as pd
+from pandas.io import gbq
+from lifelines import KaplanMeierFitter
+import plotly.graph_objs as go
 
 
 def runSyncQuery(query, parameters, project):
+	print "Running query"
 	bq = bigquery.Client(project=project)
 	if parameters is not None:
 		query_results = bq.run_sync_query(query, query_parameters = parameters)
@@ -22,9 +27,10 @@ def runSyncQuery(query, parameters, project):
 	query_results.use_legacy_sql = False
 	query_results.run()
 	rows = query_results.fetch_data()
+	print "Returning results"
 	return rows
 	
-def getProjects():
+def getProjects(project):
 	rows = []
 	query = ("""
 		select project_short_name
@@ -35,62 +41,171 @@ def getProjects():
 	rows = runSyncQuery(query, None, project)
 	return rows
 
-def projectDropdown(projects):
-	return dcc.Dropdown( id = 'project-dropdown', 
-						options = [	
-						{'label' : project[0], 'value' : project[0] } for project in projects
-						])	
-
+def getData(project,study, genename):
+	rows = []
+	query = ("""
+		WITH clin_table AS (
+		SELECT 
+			case_barcode, days_to_last_known_alive, vital_status
+		FROM
+			`isb-cgc.TCGA_bioclin_v0.Clinical`
+		WHERE
+			project_short_name = @study ),
+		mut_table AS (
+		SELECT
+			case_barcode,
+		IF ( case_barcode IN (
+			SELECT
+				case_barcode
+			FROM
+				`isb-cgc.TCGA_hg38_data_v0.Somatic_Mutation`
+		WHERE
+		SYMBOL = @genename
+		AND Variant_Classification <> 'Silent'
+		AND Variant_Type = 'SNP'
+		AND IMPACT <> 'LOW'), 'Mutant', 'WT') AS mutation_status
+		FROM
+			`isb-cgc.TCGA_hg38_data_v0.Somatic_Mutation` )
+		SELECT
+			mut_table.case_barcode, days_to_last_known_alive, vital_status, mutation_status
+		FROM
+			clin_table
+		JOIN
+			mut_table
+		ON
+			clin_table.case_barcode = mut_table.case_barcode
+		GROUP BY
+			mut_table.case_barcode,
+			days_to_last_known_alive,
+			vital_status,
+			mutation_status
+	""")
+	
+	query_parameters = ( bigquery.ScalarQueryParameter('study', 'STRING', study),
+						bigquery.ScalarQueryParameter('genename', 'STRING', genename)
+						)
+	rows = runSyncQuery(query, query_parameters, project)
+	return rows
 
 ###Main Section######
 app = dash.Dash()
 
-projects = ('TCGA-BRCA', 'TCGA-ACC', 'TCGA-ESCA')
+projects = []
+wt = [1]
+mut = [1]
 
 app.layout = html.Div([
-	html.Div(id = 'main_div'),
-	html.Button( ['Login via Google'],
-		id = 'loginbutton'
-	),
-	html.P('Project ID'),
-	dcc.Input(
-		id = 'projectid',
-		placeholder = 'Enter Project ID Here',
-		type = 'text',
-		value = ''
-	),
-	html.P('Cohort'),
-	projectDropdown(projects),
-	html.P('Gene Symbol'),
-	dcc.Input(
-		id = 'genename',
-		placeholder = 'Enter gene name here',
-		type = 'text',
-		value = ''
-	),
-	html.P('Click to graph'),
-	html.Button(['Submit'])
+	html.Div([
+		html.Button( ['Login via Google'],
+			id = 'loginbutton'
+		),
+		html.P('Project ID'),
+		dcc.Input(
+			id = 'projectid',
+			placeholder = 'Enter Project ID Here',
+			type = 'text',
+			value = ''
+		),
+		html.P('Cohort'),
+		dcc.Dropdown(id = 'project-dropdown'),
+		html.P('Gene Symbol'),
+		dcc.Input(
+			id = 'genename',
+			placeholder = 'Enter gene name here',
+			type = 'text',
+			value = ''
+		),
+		html.P('Click to graph'),
+		html.Button(['Submit'],
+			id = 'submitbutton')
 	
-  ],
-  style = {"width" : '10%'}
-)
+	],
+	style = {"width" : '20%'}
+	),
+	html.Div([
+		dcc.Graph(id = 'graph')
+	])
+])
 
+# https://github.com/plotly/dash-recipes/blob/master/sql_dash_dropdown.py
 @app.callback(
-dash.dependencies.Output(component_id = 'main_div',component_property = 'children'),
-[dash.dependencies.Input("loginbutton","value")]
+	Output('project-dropdown', 'options'),
+	events = [Event('loginbutton', 'click')]
 )
-def doLogin(value):
-	#pihl.get_credentials(None, "prod", True)
+def doLogin():
 	credentials = GoogleCredentials.get_application_default()
 	print credentials
-	
-@app.callback(
-dash.dependencies.Output(component_id = "project-dropdown", component_property = 'value'),
-[dash.dependencies.Input("loginbutton", "value")]
-)
-def doProjects(value):
-	projects = getProjects()
-	
+	projects = getProjects('cgc-05-0016')
+	return[ {'label' : project[0], 'value' : project[0]} for project in projects]
 
+#https://github.com/plotly/dash-recipes/blob/master/dash-click.py
+@app.callback(
+	Output('graph', 'figure'),
+	state = [ State('genename','value'),
+	State('project-dropdown', 'value'),
+	State('projectid', 'value')],
+	events = [Event('submitbutton', 'click')]
+)
+def graphQuery(gene, study, project):
+	print "Graph query"
+	wt_time = []
+	wt_state = []
+	mut_time = []
+	mut_state = []
+	kmf = KaplanMeierFitter()
+	
+	rows = getData(project, study, gene)
+	print ("Project: %s  Study: %s  Gene: %s") % (project, study, gene)
+	for (barcode, days, vital, mutation) in rows:
+		if mutation == 'WT':
+			wt_time.append(days)
+			if vital == 'Alive':
+				wt_state.append(1)
+			else:
+				wt_state.append(0)
+		elif mutation == 'Mutation':
+			mut_time.append(days)
+			if vital == 'Alive':
+				mut_state.append(1)
+			else:
+				mut_state.append(0)
+		else:
+			print "Neither WT nor Mutation"
+
+	print "Starting Fit"
+	kmf.fit(wt_time, event_observed=wt_state)
+	#https://plot.ly/ipython-notebooks/survival-analysis-r-vs-python/#using-python
+	print "Starting plotting"
+	#In lifelines, once the fit is done, survival_function_ is a dataframe
+	print (kmf.survival_function_)
+	for (index,row) in kmf.survival_function_.iterrows():
+		print ("%s\t%s") % (index, row.loc['KM_estimate'])
+		
+	return {
+				'data' : [
+					go.Scatter(
+						x = row.loc['KM_estimate'],
+						y = index,
+						mode = 'markers',
+						marker={
+                        'size': 15,
+                        'line': {'width': 0.5, 'color': 'white'}
+						}
+					) for (index, row) in kmf.survival_function_.iterrows()
+				],
+				'layout': go.Layout(
+					xaxis = {'title' : 'Time'},
+					yaxis = {'title' : 'Survival Rate'}
+				)
+			}
+	
+	#return figure
+	#return {
+	#	'data' : [
+	#	
+	#		{ 'x' : [index], 'y' :row.loc['KM_estimate'] } for (index,row) in kmf.survival_function_.iterrows()
+	#	]
+	#}
+	
 if __name__ == '__main__':
     app.run_server(debug=True)
