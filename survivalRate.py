@@ -18,7 +18,6 @@ import plotly.graph_objs as go
 
 
 def runSyncQuery(query, parameters, project):
-	print "Running query"
 	bq = bigquery.Client(project=project)
 	if parameters is not None:
 		query_results = bq.run_sync_query(query, query_parameters = parameters)
@@ -27,7 +26,6 @@ def runSyncQuery(query, parameters, project):
 	query_results.use_legacy_sql = False
 	query_results.run()
 	rows = query_results.fetch_data()
-	print "Returning results"
 	return rows
 	
 def getProjects(project):
@@ -90,10 +88,6 @@ def getData(project,study, genename):
 ###Main Section######
 app = dash.Dash()
 
-projects = []
-wt = [1]
-mut = [1]
-
 app.layout = html.Div([
 	html.Div([
 		html.Button( ['Login via Google'],
@@ -130,12 +124,14 @@ app.layout = html.Div([
 # https://github.com/plotly/dash-recipes/blob/master/sql_dash_dropdown.py
 @app.callback(
 	Output('project-dropdown', 'options'),
+	state = [State ('projectid', 'value')],
 	events = [Event('loginbutton', 'click')]
 )
-def doLogin():
+def doLogin(project):
+	projects = []
 	credentials = GoogleCredentials.get_application_default()
 	print credentials
-	projects = getProjects('cgc-05-0016')
+	projects = getProjects(project)
 	return[ {'label' : project[0], 'value' : project[0]} for project in projects]
 
 #https://github.com/plotly/dash-recipes/blob/master/dash-click.py
@@ -152,31 +148,37 @@ def graphQuery(gene, study, project):
 	wt_state = []
 	mut_time = []
 	mut_state = []
-	#kmf = KaplanMeierFitter()
 	wtdf = KaplanMeierFitter()
 	mutdf = KaplanMeierFitter()
 	
 	rows = getData(project, study, gene)
-	print ("Project: %s  Study: %s  Gene: %s") % (project, study, gene)
+	print "Starting row parse"
 	for (barcode, days, vital, mutation) in rows:
 		if mutation == 'WT':
-			wt_time.append(days)
+			#There are negative day values, set to 0
+			if days >= 0:
+				wt_time.append(days)
+			else:
+				wt_time.append(0)
 			if vital == 'Alive':
 				wt_state.append(1)
 			else:
 				wt_state.append(0)
 		elif mutation == 'Mutant':
-			mut_time.append(days)
+			if days >= 0:
+				mut_time.append(days)
+			else:
+				mut_time.append(0)
 			if vital == 'Alive':
 				mut_state.append(1)
 			else:
 				mut_state.append(0)
 		else:
 			print "Neither WT nor Mutant"
-
+	
 	wtdf.fit(wt_time, event_observed=wt_state)
 	mutdf.fit(mut_time, event_observed=mut_state)
-	
+		
 	#https://plot.ly/ipython-notebooks/survival-analysis-r-vs-python/#using-python
 	#In lifelines, once the fit is done, survival_function_ is a dataframe
 	#https://github.com/plotly/dash-wind-streaming/blob/master/app.py
