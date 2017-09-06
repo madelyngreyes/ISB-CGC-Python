@@ -114,12 +114,14 @@ app.layout = html.Div([
 			id = 'submitbutton')
 	
 	],
-	style = {"width" : '20%'}
+	style = {"width" : '20%', "float" : "left"}
 	),
 	html.Div([
 		dcc.Graph(id = 'graph')
-	])
-])
+	],
+	style = {"width" : '80%', "height" : "100vh", "float" : "right"})
+],
+style = {"height" : "100vh"})
 
 # https://github.com/plotly/dash-recipes/blob/master/sql_dash_dropdown.py
 @app.callback(
@@ -130,8 +132,7 @@ app.layout = html.Div([
 def doLogin(project):
 	projects = []
 	credentials = GoogleCredentials.get_application_default()
-	print credentials
-	projects = getProjects(project)
+	projects = getProjects(project.lower())
 	return[ {'label' : project[0], 'value' : project[0]} for project in projects]
 
 #https://github.com/plotly/dash-recipes/blob/master/dash-click.py
@@ -143,7 +144,6 @@ def doLogin(project):
 	events = [Event('submitbutton', 'click')]
 )
 def graphQuery(gene, study, project):
-	print "Graph query"
 	wt_time = []
 	wt_state = []
 	mut_time = []
@@ -151,8 +151,7 @@ def graphQuery(gene, study, project):
 	wtdf = KaplanMeierFitter()
 	mutdf = KaplanMeierFitter()
 	
-	rows = getData(project, study, gene)
-	print "Starting row parse"
+	rows = getData(project.lower(), study, gene.upper())
 	for (barcode, days, vital, mutation) in rows:
 		if mutation == 'WT':
 			#There are negative day values, set to 0
@@ -182,20 +181,77 @@ def graphQuery(gene, study, project):
 	#https://plot.ly/ipython-notebooks/survival-analysis-r-vs-python/#using-python
 	#In lifelines, once the fit is done, survival_function_ is a dataframe
 	#https://github.com/plotly/dash-wind-streaming/blob/master/app.py
-	trace0 = go.Scatter(
+	#https://plot.ly/r/reference/#scatter-fill
+	wildtypeupper = go.Scatter(
+		name = 'WT Upper Bound',
+		y = wtdf.confidence_interval_['KM_estimate_upper_0.95'],
+		x = wtdf.confidence_interval_.index,
+		mode = 'lines',
+		marker=dict(color="444"),
+		line=dict(width=0),
+		fillcolor='rgba(255,165,0,0.3)',
+		fill='tonextx'
+	)
+	wildtypedata = go.Scatter(
 		y = wtdf.survival_function_['KM_estimate'],
 		x = wtdf.survival_function_.index,
+		mode = 'lines+markers',
+		name = 'Wild Type',
+		line = dict(color='rgb(255,165,0)')
+	)
+	wildtypelower = go.Scatter(
+		name = 'WT Lower Bound',
+		y = wtdf.confidence_interval_['KM_estimate_lower_0.95'],
+		x = wtdf.confidence_interval_.index,
 		mode = 'lines',
-		name = 'Wild Type'
-		)
-	trace1 = go.Scatter(	
+		marker=dict(color="444"),
+		line=dict(width=0),
+		fillcolor='rgba(255,165,0,0.3)',
+		fill='tonextx'
+	)
+	mutantupper = go.Scatter(
+		name = 'Mut Upper Bound',
+		y = mutdf.confidence_interval_['KM_estimate_upper_0.95'],
+		x = mutdf.confidence_interval_.index,
+		mode = 'lines',
+		marker=dict(color="444"),
+		line=dict(width=0),
+		fillcolor='rgba(70,130,180,0.3)',
+		fill='tonextx'
+	)
+	mutantdata = go.Scatter(	
 		y = mutdf.survival_function_['KM_estimate'],
 		x = mutdf.survival_function_.index,
+		mode = 'lines+markers',
+		name = 'Mutant',
+		line=dict(color='rgb(70,130,180)')
+	)
+#	mutantdata = go.Scatter(	
+#		y = mutdf.survival_function_['KM_estimate'],
+#		x = mutdf.survival_function_.index,
+#		mode = 'lines+markers',
+#		name = 'Mutant',
+#		line=dict(color='rgb(31, 119, 180)'),
+#		fillcolor='rgba(31, 119, 180, 0.3)',
+#		fill='tonexty'
+#	)
+	mutantlower = go.Scatter(
+		name = 'Mut Lower Bound',
+		y = mutdf.confidence_interval_['KM_estimate_lower_0.95'],
+		x = mutdf.confidence_interval_.index,
 		mode = 'lines',
-		name = 'Mutant'
+		marker=dict(color="444"),
+		line=dict(width=0),
+		fillcolor='rgba(70,130,180,0.3)',
+		fill='tonexty'
+	)
+	layout = go.Layout(
+		title = (("Cohort: %s  Gene: %s ") % (study,gene.upper())),
+		xaxis = dict(title = 'Time'),
+		yaxis = dict(title = 'Survival Probability')
 	)
 	
-	return go.Figure (data=[trace0,trace1])
+	return go.Figure (data=[wildtypedata,wildtypelower,wildtypeupper,mutantdata,mutantlower,mutantupper], layout = layout)
 	
 if __name__ == '__main__':
     app.run_server(debug=True)
