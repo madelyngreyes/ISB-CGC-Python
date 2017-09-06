@@ -152,7 +152,9 @@ def graphQuery(gene, study, project):
 	wt_state = []
 	mut_time = []
 	mut_state = []
-	kmf = KaplanMeierFitter()
+	#kmf = KaplanMeierFitter()
+	wtdf = KaplanMeierFitter()
+	mutdf = KaplanMeierFitter()
 	
 	rows = getData(project, study, gene)
 	print ("Project: %s  Study: %s  Gene: %s") % (project, study, gene)
@@ -163,49 +165,35 @@ def graphQuery(gene, study, project):
 				wt_state.append(1)
 			else:
 				wt_state.append(0)
-		elif mutation == 'Mutation':
+		elif mutation == 'Mutant':
 			mut_time.append(days)
 			if vital == 'Alive':
 				mut_state.append(1)
 			else:
 				mut_state.append(0)
 		else:
-			print "Neither WT nor Mutation"
+			print "Neither WT nor Mutant"
 
-	print "Starting Fit"
-	kmf.fit(wt_time, event_observed=wt_state)
-	#https://plot.ly/ipython-notebooks/survival-analysis-r-vs-python/#using-python
-	print "Starting plotting"
-	#In lifelines, once the fit is done, survival_function_ is a dataframe
-	print (kmf.survival_function_)
-	for (index,row) in kmf.survival_function_.iterrows():
-		print ("%s\t%s") % (index, row.loc['KM_estimate'])
-		
-	return {
-				'data' : [
-					go.Scatter(
-						x = row.loc['KM_estimate'],
-						y = index,
-						mode = 'markers',
-						marker={
-                        'size': 15,
-                        'line': {'width': 0.5, 'color': 'white'}
-						}
-					) for (index, row) in kmf.survival_function_.iterrows()
-				],
-				'layout': go.Layout(
-					xaxis = {'title' : 'Time'},
-					yaxis = {'title' : 'Survival Rate'}
-				)
-			}
+	wtdf.fit(wt_time, event_observed=wt_state)
+	mutdf.fit(mut_time, event_observed=mut_state)
 	
-	#return figure
-	#return {
-	#	'data' : [
-	#	
-	#		{ 'x' : [index], 'y' :row.loc['KM_estimate'] } for (index,row) in kmf.survival_function_.iterrows()
-	#	]
-	#}
+	#https://plot.ly/ipython-notebooks/survival-analysis-r-vs-python/#using-python
+	#In lifelines, once the fit is done, survival_function_ is a dataframe
+	#https://github.com/plotly/dash-wind-streaming/blob/master/app.py
+	trace0 = go.Scatter(
+		y = wtdf.survival_function_['KM_estimate'],
+		x = wtdf.survival_function_.index,
+		mode = 'lines',
+		name = 'Wild Type'
+		)
+	trace1 = go.Scatter(	
+		y = mutdf.survival_function_['KM_estimate'],
+		x = mutdf.survival_function_.index,
+		mode = 'lines',
+		name = 'Mutant'
+	)
+	
+	return go.Figure (data=[trace0,trace1])
 	
 if __name__ == '__main__':
     app.run_server(debug=True)
