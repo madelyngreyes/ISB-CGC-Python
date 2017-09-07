@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # A Python/Dash version of David Gibb's August Query of the Month
 # http://isb-cancer-genomics-cloud.readthedocs.io/en/latest/sections/QueryOfTheMonthClub.html
-# https://github.com/plotly/dash-recipes
 
 
 import dash
@@ -88,42 +87,51 @@ def getData(project,study, genename):
 ###Main Section######
 app = dash.Dash()
 
+#https://codepen.io/chriddyp/pen/bWLwgP
+app.css.append_css({
+    "external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"
+})
+
 app.layout = html.Div([
 	html.Div([
-		html.Button( ['Login via Google'],
-			id = 'loginbutton'
-		),
-		html.P('Project ID'),
-		dcc.Input(
-			id = 'projectid',
-			placeholder = 'Enter Project ID Here',
-			type = 'text',
-			value = ''
-		),
-		html.P('Cohort'),
-		dcc.Dropdown(id = 'project-dropdown'),
-		html.P('Gene Symbol'),
-		dcc.Input(
-			id = 'genename',
-			placeholder = 'Enter gene name here',
-			type = 'text',
-			value = ''
-		),
-		html.P('Click to graph'),
-		html.Button(['Submit'],
-			id = 'submitbutton')
-	
-	],
-	style = {"width" : '20%', "float" : "left"}
-	),
-	html.Div([
-		dcc.Graph(id = 'graph')
-	],
-	style = {"width" : '80%', "height" : "100vh", "float" : "right"})
-],
-style = {"height" : "100vh"})
+		html.Div([
+			html.Div([
+				html.H3('Project ID'),
+				dcc.Input(
+					id = 'projectid',
+					placeholder = 'Enter Project ID Here',
+					type = 'text',
+					value = ''
+				),
+				],className = "row"),
+			html.Div([
+				html.Button(['Login via Google'],
+				id = 'loginbutton')
+			], className = "row"),
+		], className = "three columns"), #Project and Login button Div
+		html.Div([
+			html.H3('Cohorts'),
+			dcc.Dropdown(id = 'project-dropdown'),
+		], className = "three columns"), #Dropdown Div
+		html.Div([
+			html.H3('Gene Symbol'),
+			dcc.Input(
+				id = 'genename',
+				placeholder = 'Enter gene name here',
+				type = 'text',
+				value = ''
+			)
+		], className = "three columns"), #Gene Symbol Div
+		html.Div([
+			html.H3('Click to graph'),
+			html.Button(['Graph'],
+				id = 'submitbutton')
+		], className = "three columns" ) #Graph Button Div
+	], className = "row"), #Component Layout Div
+	dcc.Graph(id='graph')
+])
 
-# https://github.com/plotly/dash-recipes/blob/master/sql_dash_dropdown.py
+
 @app.callback(
 	Output('project-dropdown', 'options'),
 	state = [State ('projectid', 'value')],
@@ -135,7 +143,6 @@ def doLogin(project):
 	projects = getProjects(project.lower())
 	return[ {'label' : project[0], 'value' : project[0]} for project in projects]
 
-#https://github.com/plotly/dash-recipes/blob/master/dash-click.py
 @app.callback(
 	Output('graph', 'figure'),
 	state = [ State('genename','value'),
@@ -177,11 +184,8 @@ def graphQuery(gene, study, project):
 	
 	wtdf.fit(wt_time, event_observed=wt_state)
 	mutdf.fit(mut_time, event_observed=mut_state)
-		
-	#https://plot.ly/ipython-notebooks/survival-analysis-r-vs-python/#using-python
-	#In lifelines, once the fit is done, survival_function_ is a dataframe
-	#https://github.com/plotly/dash-wind-streaming/blob/master/app.py
-	#https://plot.ly/r/reference/#scatter-fill
+
+	#In lifelines, once the fit is done, survival_function_ and confidence_interval are pandas dataframes
 	wildtypeupper = go.Scatter(
 		name = 'WT Upper Bound',
 		y = wtdf.confidence_interval_['KM_estimate_upper_0.95'],
@@ -226,15 +230,6 @@ def graphQuery(gene, study, project):
 		name = 'Mutant',
 		line=dict(color='rgb(70,130,180)')
 	)
-#	mutantdata = go.Scatter(	
-#		y = mutdf.survival_function_['KM_estimate'],
-#		x = mutdf.survival_function_.index,
-#		mode = 'lines+markers',
-#		name = 'Mutant',
-#		line=dict(color='rgb(31, 119, 180)'),
-#		fillcolor='rgba(31, 119, 180, 0.3)',
-#		fill='tonexty'
-#	)
 	mutantlower = go.Scatter(
 		name = 'Mut Lower Bound',
 		y = mutdf.confidence_interval_['KM_estimate_lower_0.95'],
