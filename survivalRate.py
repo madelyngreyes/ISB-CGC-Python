@@ -16,16 +16,17 @@ from lifelines import KaplanMeierFitter
 import plotly.graph_objs as go
 
 
-def runSyncQuery(query, parameters, project):
-	bq = bigquery.Client(project=project)
-	if parameters is not None:
-		query_results = bq.run_sync_query(query, query_parameters = parameters)
-	else:
-		query_results = bq.run_sync_query(query)
-	query_results.use_legacy_sql = False
-	query_results.run()
-	rows = query_results.fetch_data()
-	return rows
+def runSyncQuery(query,  parameters,  project):
+    bq = bigquery.Client(project = project)
+    if parameters is not None:
+        config = bigquery.QueryJobConfig()
+        config.query_parameters = parameters
+        query_job = bq.query(query,  job_config = config)
+    else:
+        query_job = bq.query(query)
+        
+    rows = query_job.result()
+    return rows
 	
 def getProjects(project):
 	rows = []
