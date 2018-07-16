@@ -30,10 +30,6 @@ from oauth2client.file import Storage
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# the CLIENT_ID for the ISB-CGC site
-#CLIENT_ID = '907668440978-0ol0griu70qkeb6k3gnn2vipfa5mgl60.apps.googleusercontent.com'
-# The google-specified 'installed application' OAuth pattern
-#CLIENT_SECRET = 'To_WJH7-1V-TofhNGcEqmEYi'
 # The google defined scope for authorization
 EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
 # where a default credentials file will be stored for use by the endpoints
@@ -125,7 +121,7 @@ def cohortsFiles(service, cohort_id, limit):
 	
 def cohortsPreview(service, body):
 	try:
-		data = service.cohorts().preview(**body).execute()
+		data = service.cohorts().preview(body=body).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -204,18 +200,16 @@ def caseAnnotations(service,barcode):
 	except HttpError as exception:
 		raise exception
 
-def getCohortIDs(cohortlist):
-	tcgacohort = 'All TCGA Data'
-	targetcohort = 'All TARGET for testing'
-	cclecohort = 'All CCLE for testing'
-	cohortdictionary = {}
+def getCohortIDs(cohortlist, cohortname, program):
+	cohortdictionary = {
+		'TCGA' : None,
+		'TARGET' : None,
+		'CCLE' : None
+	}
+	
 	for cohort in cohortlist['items']:
-		if cohort['name'] == tcgacohort:
-			cohortdictionary['TCGA'] = cohort['id']
-		elif cohort['name'] == targetcohort:
-			cohortdictionary['TARGET'] = cohort['id']
-		elif cohort['name'] == cclecohort:
-			cohortdictionary['CCLE'] = cohort['id']
+		if cohort['name'] == cohortname:
+			cohortdictionary[program] = cohort['id']
 	return cohortdictionary
 	
 def main(args):
@@ -235,12 +229,24 @@ def main(args):
 	version = "v3"
 	program_api = getProgram(args.program)
 	site = getSite(args.tier)
+
 	
 	preview_request = {
-		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}',
-		'TARGET' : '{"project_short_name" : ["TARGET-AML", "TARGET-WT"], "age_at_diagnosis_gte": 7}',
-		'CCLE' : '{"project_short_name" : ["CCLE-COAD", "CCLE-READ"], "gender": "Male"}'
+		'TCGA' : '{"Common": {"project_short_name": ["TCGA-BRCA","TCGA-UCS"]}, "Clinical": {"age_at_diagnosis_gte": 90}}',
+		'TARGET' : '{"Common" : {"project_short_name" : ["TARGET-AML", "TARGET-WT"]}, "Clinical" : {"age_at_diagnosis_gte": 7}}',
+		'CCLE' : '{"Common" : {"project_short_name" : ["CCLE-COAD", "CCLE-READ"]}, "Clinical" : {"gender": "Male"}}'
 		}
+	testing_cohort_request = {
+		'TARGET' : '{"program_name" : ["TARGET"] }',
+		'CCLE' : '{"program_name" : ["CCLE"]}',
+		'TCGA' : '{"program_name" : ["TCGA"]}'
+	}
+	testing_cohort_name = {
+		'TARGET' : 'All TARGET for testing',
+		'CCLE': 'All CCLE for testing',
+		"TCGA": 'All TCGA Data'
+	}
+	
 	case_barcode = {'TCGA' : 'TCGA-DJ-A3US', 'TARGET' : 'TARGET-20-PABLDZ', 'CCLE' : 'FU-OV-1'}
 	sample_barcode = {'TCGA' : 'TCGA-DJ-A3US-10A', 'TARGET' : 'TARGET-20-PABLDZ-04A', 'CCLE' : 'CCLE-FU-OV-1'}
 	aliquot_barcode = {'TCGA' :'TCGA-DJ-A3US-10A-01D-A22C-01', 'TARGET' : 'TARGET-20-PABLDZ-04A-01R', 'CCLE' : 'CCLE-FU-OV-1-RNA-08'}
@@ -248,6 +254,7 @@ def main(args):
 	cohort_name = "%s_%s_%s_%s_API_Testing_Cohort" % (now.month, now.day, now.year, args.program)
 	testing_cohort_id = None
 	recordlimit = 0
+
 	
 
 	#Get credentials
@@ -265,14 +272,26 @@ def main(args):
 	#                                                    #
 	######################################################
 	
-	#Need to test the list first so that we can retrieve a valid cohort ID in case 1 isn't value
+	#Need to test the cohort list first so that we can retrieve a valid cohort ID in case 1 isn't value
 	#test cohorts().list() endpoint
 	# The following enpoints are program agnostic:  cohorts.cloud_storage_file_paths, cohorts.delete, cohorts, get, cohorts.list
 	vPrint(args.verbose, "cohorts().list() test")
 	try:
 		data = cohortsList(common_auth_service)
-		cohort_id_set = getCohortIDs(data)
+		cohort_id_set = getCohortIDs(data, testing_cohort_name[args.program], args.program)
 		cohort_id = cohort_id_set[args.program]
+		
+		#If the testing cohort doesn't exist, create it
+		if cohort_id is None:
+			vPrint(args.verbose, ("No testing cohort for %s, creating one" % args.program))
+			try:
+				data = cohortsCreate(program_auth_service, testing_cohort_name[args.program], json.loads(testing_cohort_request[args.program]))
+				cohort_id = data['id'] 
+				vPrint(args.verbose, ("Testing cohort id is %s" % cohort_id))
+				logTest(logfile,args.program, args.tier,"Creating Testing Cohort", "PASS", "Successfully created Testing cohort " + cohort_id)
+			except HttpError as exception:
+				logTest(logfile, args.program, args.tier, "Creating Testing Cohort", "FAIL", exception)
+		
 		vPrint(args.verbose, ("Program:\t%s\tCohort ID:\t%s" % (args.program, cohort_id)))
 		logTest(logfile,args.program, args.tier,"Cohorts List Test","PASS", "Number of cohorts found: " + str(data['count']))
 	except HttpError as exception:
@@ -280,11 +299,14 @@ def main(args):
 		
 	#Test cohorts().cloud_storage_file_paths()
 	vPrint(args.verbose, "cohorts().cloud_storage_file_paths() test")
-	try:
-		data = cohortsFiles(common_auth_service, cohort_id, recordlimit)
-		logTest(logfile,args.program, args.tier,"Cohorts Storage File Paths", "PASS", "Number of cohort files found: " + str(data['count']) + " for cohort " + cohort_id)
-	except HttpError as exception:
-		logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths", "FAIL", exception)
+	if cohort_id is not None:
+		try:
+			data = cohortsFiles(common_auth_service, cohort_id, recordlimit)
+			logTest(logfile,args.program, args.tier,"Cohorts Storage File Paths", "PASS", "Number of cohort files found: " + str(data['count']) + " for cohort " + cohort_id)
+		except HttpError as exception:
+			logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths", "FAIL", exception)
+	else:
+		logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths", "FAIL", "No valid cohort ID provided")
 	
 	#test cohorts().preview()
 	vPrint(args.verbose, "cohorts().preview() test")
@@ -296,11 +318,14 @@ def main(args):
 	
 	#test cohorts().get()
 	vPrint(args.verbose, "cohorts().get() test")
-	try:
-		data = cohortsGet(common_auth_service, cohort_id)
-		logTest(logfile, args.program, args.tier, "Cohorts Get Test", "PASS", "Cohort sample count: " + str(data['sample_count']))
-	except HttpError as exception:
-		logTest(logfile, args.program, args.tier, "Cohorts Get Test", "FAIL", exception)
+	if cohort_id is None:
+		logTest(logfile, args.program, args.tier, "Cohorts Get Test", "FAIL", "No testing cohort available")
+	else:
+		try:
+			data = cohortsGet(common_auth_service, cohort_id)
+			logTest(logfile, args.program, args.tier, "Cohorts Get Test", "PASS", "Cohort sample count: " + str(data['sample_count']))
+		except HttpError as exception:
+			logTest(logfile, args.program, args.tier, "Cohorts Get Test", "FAIL", exception)
 		
 	#test cohorts().create()
 	vPrint(args.verbose, "cohorts().create() test")
@@ -351,13 +376,14 @@ def main(args):
 		logTest(logfile, args.program, args.tier, "Sample File Path Test", "FAIL", exception)
 	
 	#Test User Endpoint
-	
-	vPrint(args.verbose, "users().get() test")
-	try:
-		data = usersGet(program_auth_service)
-		logTest(logfile, args.program, args.tier, "Users Get Test", "PASS", data['message'])
-	except HttpError as exception:
-		logTest(logfile, args.program, args.tier, "Users Get Test", "FAIL", exception)
+	#Don't test if CCLE, it doesn't have this
+	if (args.program != "CCLE"):
+		vPrint(args.verbose, "users().get() test")
+		try:
+			data = usersGet(program_auth_service)
+			logTest(logfile, args.program, args.tier, "Users Get Test", "PASS", data['message'])
+		except HttpError as exception:
+			logTest(logfile, args.program, args.tier, "Users Get Test", "FAIL", exception)
 	
 	#Check the annotations endpoints only if testing TCGA
 	if (args.program == "TCGA"):

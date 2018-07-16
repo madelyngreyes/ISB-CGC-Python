@@ -9,8 +9,8 @@
 
 usage() { echo "Usage: $0 [-v <VM name>] [-u <username>] [-p <port number> Default is 3306] [-n No tunnel]" 1>&2; exit 1; }
 
-VMNAME="DEFAULT VM NAME HERE"
-USER="DEFAULT USER NAME HERE"
+VMNAME="tdp-pi"
+USER="todd_pihl"
 PORT=3306
 TUNNEL="True"
 
@@ -34,18 +34,22 @@ while getopts "v:u:p:n" args; do
 	esac
 done
 
-INSTANCES=$(gcloud compute instances list --format=json | jq '.[] | .name,.networkInterfaces[].accessConfigs[].natIP')
-IFS='"' read -ra ARRAY <<< ${INSTANCES}
+echo "VMNAME: ${VMNAME}  USER: ${USER}  PORT: ${PORT}  TUNNEL: ${TUNNEL}"
 
-for ((i=0; i<${#ARRAY[*]};i++)); do
-	if [[ "${ARRAY[i]}" == "${VMNAME}" ]]; then
-		IP="${ARRAY[$((i+2))]}"
+INSTANCES=($(gcloud compute instances list --format=json | jq -r '.[] | .name,.networkInterfaces[].accessConfigs[].natIP|tostring'))
+
+for ((i=0; i<${#INSTANCES[*]};i++)); do
+	if [[ "${INSTANCES[i]}" == "${VMNAME}" ]]; then
+		IP="${INSTANCES[$((i+1))]}"
 	fi
 done
 
+echo "User: ${USER}  IP: ${IP}"
 
-if [[ "${TUNNEL}" -eq "True" ]] ; then
+if [ "${TUNNEL}" == "True" ] ; then
+	echo "ssh ${USER}@${IP} -L ${PORT}:localhost:${PORT}"
 	ssh ${USER}@${IP} -L ${PORT}:localhost:${PORT}
 else
+	echo "ssh ${USER}@${IP}"
 	ssh ${USER}@${IP}
 fi
