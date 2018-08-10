@@ -13,7 +13,7 @@
 #
 # For testing TARGET and CCLE on the different tiers, you need to first create cohorts with specific names.  TCGA has a universally shared cohort
 # TARGET - "All TARGET for testing"
-# CCLE - "All TARGET for testing"
+# CCLE - "All CCLE for testing"
 # TCGA - "All TCGA Data"
 #
 
@@ -118,6 +118,16 @@ def cohortsFiles(service, cohort_id, limit):
 		return data
 	except HttpError as exception:
 		raise exception
+
+def cohortsFileManifest(service, cohort_id, limit, offset, filters):
+	try:
+		if not filters:
+			data = service.cohorts().file_manifest(fetch_count=limit, offset=offset, cohort_id=cohort_id).execute()
+		else:
+			data = service.cohorts().file_manifest_filtered(body={"filters": filters}, fetch_count=limit, offset=offset, cohort_id=cohort_id).execute()
+		return data
+	except HttpError as exception:
+		raise exception
 	
 def cohortsPreview(service, body):
 	try:
@@ -155,6 +165,14 @@ def casesGet(service, barcode):
 	except HttpError as exception:
 		raise exception
 
+def casesGetList(service, barcodes):
+	try:
+		data = service.cases().get_list(body={"filters": {"case_barcodes": barcodes}}).execute()
+		return data
+	except HttpError as exception:
+		raise exception
+
+
 #Samples testing	
 def samplesGet(service,barcode):
 	try:
@@ -162,7 +180,14 @@ def samplesGet(service,barcode):
 		return data
 	except HttpError as exception:
 		raise exception
-	
+
+def samplesGetList(service,barcodes):
+	try:
+		data = service.samples().get_list(body={"filters": {"sample_barcodes": barcodes}}).execute()
+		return data
+	except HttpError as exception:
+		raise exception
+
 def samplesFiles(service,barcode):
 	try:
 		data = service.samples().cloud_storage_file_paths(sample_barcode=barcode).execute()
@@ -248,14 +273,28 @@ def main(args):
 	}
 	
 	case_barcode = {'TCGA' : 'TCGA-DJ-A3US', 'TARGET' : 'TARGET-20-PABLDZ', 'CCLE' : 'FU-OV-1'}
+	case_barcodes = {
+		'TCGA': ['TCGA-DJ-A3US','TCGA-FD-A6TE','TCGA-XF-A8HB','TCGA-ZF-AA4X'],
+		'TARGET': ['TARGET-20-PABLDZ','TARGET-52-PAVYDM','TARGET-52-PASRHU'],
+		'CCLE': ['CAL-78','MG-63','Hs 888.T']
+	}
 	sample_barcode = {'TCGA' : 'TCGA-DJ-A3US-10A', 'TARGET' : 'TARGET-20-PABLDZ-04A', 'CCLE' : 'CCLE-FU-OV-1'}
+	sample_barcodes = {
+		'TCGA': ['TCGA-DJ-A3US-10A','TCGA-DX-A23Z-10A','TCGA-AB-2878-03A'],
+		'TARGET': ['TARGET-20-PABLDZ-04A','TARGET-52-PASRHU-10A','TARGET-52-PAVYDM-11A'],
+		'CCLE': ['CCLE-FU-OV-1','CCLE-Saos-2','CCLE-SIMA']
+	}
 	aliquot_barcode = {'TCGA' :'TCGA-DJ-A3US-10A-01D-A22C-01', 'TARGET' : 'TARGET-20-PABLDZ-04A-01R', 'CCLE' : 'CCLE-FU-OV-1-RNA-08'}
 	
 	cohort_name = "%s_%s_%s_%s_API_Testing_Cohort" % (now.month, now.day, now.year, args.program)
 	testing_cohort_id = None
 	recordlimit = 0
-
-	
+	manfiest_limit = 100
+	manifest_offset = 0
+	manifest_filters = {
+		"disease_code": ["BRCA", "LUSC", "ALL"],
+		"data_format": ["ZIP","BAM", "TAR"]
+	}
 
 	#Get credentials
 	vPrint(args.verbose, ("Using credentials %s" % str(args.credentialsfile)))
@@ -307,7 +346,29 @@ def main(args):
 			logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths", "FAIL", exception)
 	else:
 		logTest(logfile, args.program, args.tier, "Cohorts Cloud Storage File Paths", "FAIL", "No valid cohort ID provided")
-	
+
+	# Test cohorts().file_manifest()
+	vPrint(args.verbose, "cohorts().file_manifest() test")
+	if cohort_id is not None:
+		try:
+			data = cohortsFileManifest(common_auth_service, cohort_id, manfiest_limit, manifest_offset, None)
+			logTest(logfile,args.program, args.tier,"Cohorts File Manifest", "PASS", "Number of cohort files found: " + str(data['files_retrieved']) + " for cohort " + cohort_id)
+		except HttpError as exception:
+			logTest(logfile, args.program, args.tier, "Cohorts ile Manifest", "FAIL", exception)
+	else:
+		logTest(logfile, args.program, args.tier, "Cohorts ile Manifest", "FAIL", "No valid cohort ID provided")
+
+	# Test cohorts().file_manifest_filtered()
+	vPrint(args.verbose, "cohorts().file_manifest_filtered() test")
+	if cohort_id is not None:
+		try:
+			data = cohortsFileManifest(common_auth_service, cohort_id, manfiest_limit, manifest_offset, manifest_filters)
+			logTest(logfile,args.program, args.tier,"Cohorts File Manifest w/Filters", "PASS", "Number of cohort files found: " + str(data['files_retrieved']) + " for cohort " + cohort_id)
+		except HttpError as exception:
+			logTest(logfile, args.program, args.tier, "Cohorts ile Manifest w/Filters", "FAIL", exception)
+	else:
+		logTest(logfile, args.program, args.tier, "Cohorts ile Manifest w/Filters", "FAIL", "No valid cohort ID provided")
+
 	#test cohorts().preview()
 	vPrint(args.verbose, "cohorts().preview() test")
 	try:
@@ -356,7 +417,15 @@ def main(args):
 		logTest(logfile, args.program, args.tier, "Patient Get Test", "PASS", "Number of samples for case: " + str(len(data['samples'])))
 	except HttpError as exception:
 		logTest(logfile, args.program, args.tier, "Patients Get Test", "FAIL" , exception)
-	
+
+	#test cases().get_list()
+	vPrint(args.verbose, "cases().get_list() test")
+	try:
+		data = casesGetList(program_auth_service, case_barcodes[args.program])
+		logTest(logfile, args.program, args.tier, "Patient Get Test", "PASS", "Number of samples for case: " + str(len(data['samples'])))
+	except HttpError as exception:
+		logTest(logfile, args.program, args.tier, "Patients Get Test", "FAIL" , exception)
+
 	#Test Sample Endpoints
 	
 	#test samples().get()
@@ -366,7 +435,15 @@ def main(args):
 		logTest(logfile, args.program, args.tier, "Sample Get Test", "PASS", "Number of sample detail sections: " + str(data['data_details_count']))
 	except HttpError as exception:
 		logTest(logfile, args.program, args.tier, "Samples Get test", "FAIL", exception)
-	
+
+	#test samples().get_list()
+	vPrint(args.verbose, "samples().get_list() test")
+	try:
+		data = samplesGetList(program_auth_service, sample_barcodes[args.program])
+		logTest(logfile, args.program, args.tier, "Sample Get List Test", "PASS", "Number of sample detail sections: " + str(data['data_details_count']))
+	except HttpError as exception:
+		logTest(logfile, args.program, args.tier, "Samples Get List test", "FAIL", exception)
+
 	#test samples().cloud_storage_file_paths()
 	vPrint(args.verbose, "samples().cloud_storage_file_paths() test")
 	try:
