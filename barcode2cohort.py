@@ -1,62 +1,11 @@
 #!/usr/bin/python
-import pihlStuff.py as pihl
+import pihlStuff as pihl
 import argparse
-#import os
-#import pprint
 import httplib2
 import datetime
+import os
 import json
-#from oauth2client.client import OAuth2WebServerFlow
-#from oauth2client import tools
-#from oauth2client.file import Storage
-#from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
-# the CLIENT_ID for the ISB-CGC site
-#CLIENT_ID = '907668440978-0ol0griu70qkeb6k3gnn2vipfa5mgl60.apps.googleusercontent.com'
-# The google-specified 'installed application' OAuth pattern
-#CLIENT_SECRET = 'To_WJH7-1V-TofhNGcEqmEYi'
-# The google defined scope for authorization
-#EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
-# where a default credentials file will be stored for use by the endpoints
-#DEFAULT_STORAGE_FILE = os.path.join(os.path.expanduser("~"), '.isb_credentials')
-
-
-#def get_credentials(credFile):
-#	oauth_flow_args = ['--noauth_local_webserver']
-#	if credFile is None:
-#		storage = Storage(DEFAULT_STORAGE_FILE)
-#	else:
-#		storage = Storage(credFile)
-#		
-#	credentials = storage.get()
-#	if not credentials or credentials.invalid:
-#		flow = OAuth2WebServerFlow(CLIENT_ID, CLIENT_SECRET, EMAIL_SCOPE)
-#		flow.auth_uri = flow.auth_uri.rstrip('/') + '?approval_prompt=force'
-#		credentials = tools.run_flow(flow, storage, tools.argparser.parse_args(oauth_flow_args))
-#	return credentials
-   
-
-#def get_authorized_service(api, version, site, credentials, verbose):
-#    discovery_url = '%s/_ah/api/discovery/v1/apis/%s/%s/rest' % (site, api, version)
-#   if verbose:
-#		print discovery_url
-#    http = credentials.authorize(httplib2.Http())
-#    if credentials.access_token_expired or credentials.invalid:
-#        credentials.refresh(http)
-#    authorized_service = build(api, version, discoveryServiceUrl=discovery_url, http=http)
-#    return authorized_service
-
-#def getSite(tier):
-#	sites = {"mvm" : "https://api-dot-mvm-dot-isb-cgc.appspot.com",
-#			"dev" : "https://api-dot-mvm-dot-isb-cgc.appspot.com",
-#			"test" : "https://api-dot-isb-cgc-test.appspot.com",
-#			"prod" : "https://api-dot-isb-cgc.appspot.com" }
-#	return sites[tier]
-
-#def vPrint(doit, message):
-#	if doit:
-#		pprint.pprint(message)
 
 def logTest(filehandle, tier, testname, result):
 	now = datetime.datetime.now()
@@ -81,9 +30,9 @@ def barcodeProcess(barcodefile, barcodetype):
 	barcodelist = []
 	with open(barcodefile,"r") as barcodes:
 		for barcode in barcodes:
-			if barcodetype == "ParticipantBarcode":
+			if barcodetype == "case_barcode":
 				barcode = barcode[:12]
-			elif barcodetype == "SampleBarcode":
+			elif barcodetype == "sample_barcode":
 				barcode = barcode[:16]
 			else:
 				print "Big honking bug"
@@ -106,49 +55,48 @@ def main(args):
 	logfile.write(log_header)
 	
 	#Set up main variables
-	version = "v2"
-	api = 'isb_cgc_api'
-	site = getSite(args.tier)
-	#cohort_id = '1' #Seems like a reasonable default but will get a real one below
-	#preview_request = {"Study" : ["BRCA", "UCS"], "age_at_initial_pathologic_diagnosis_gte": 90}
+	version = "v3"
+	api = pihl.getProgram(args.program)
+	site = pihl.getSite(args.tier)
 
 	#Get credentials
-	vPrint(args.verbose, ("Using credentials %s" % str(args.credentialsfile)))
-	credentials = get_credentials(args.credentialsfile)
-	vPrint(args.verbose,credentials)
+	pihl.vPrint(args.verbose, ("Using credentials %s" % str(args.credentialsfile)))
+	credentials = pihl.get_credentials(args.credentialsfile, args.tier, args.verbose)
+	pihl.vPrint(args.verbose,credentials)
 	
 	#create Authorized Service
-	auth_service = get_authorized_service(api, version, site, credentials, args.verbose)
+	auth_service = pihl.get_authorized_service(api, version, site, credentials, args.verbose)
 	
 	#Create the barcode array
 	if args.sample:
-		barcodetype = "SampleBarcode"
+		barcodetype = "sample_barcode"
 	elif args.patient:
-		barcodetype = "ParticipantBarcode"
+		barcodetype = "case_barcode"
 	else:
 		print("No barcode type selection found, must use either -b or -p")
 		sys.exit(0)
 	barcodelist = barcodeProcess(args.barcodefile, barcodetype)
 	request = {barcodetype:barcodelist}
-	
-	#test cohorts().preview()
-	vPrint(args.verbose, "cohorts().preview() test")
-	try:
-		data = cohortsPreview(auth_service, request)
-		logTest(logfile, args.tier, "Cohorts Preview Test", data['patient_count'])
-	except HttpError as exception:
-		logTest(logfile, args.tier, "Cohorts Preview ERROR", exception)
+
 		
 		
 	#test cohorts().create()
 	if args.createcohort:
-		vPrint(args.verbose, "cohorts().create() test")
+		pihl.vPrint(args.verbose, "cohorts().create() test")
 		try:
 			data = cohortsCreate(auth_service,args.cohortname, request)
 			testing_cohort_id = data['id']  #will be used to delete in the next test
 			logTest(logfile,args.tier,"Cohorts Create Test", testing_cohort_id)
 		except HttpError as exception:
 			logTest(logfile, args.tier, "Cohorts Create ERROR", exception)
+	else:
+		#test cohorts().preview()
+		pihl.vPrint(args.verbose, "cohorts().preview() test")
+		try:
+			data = cohortsPreview(auth_service, request)
+			logTest(logfile, args.tier, "Cohorts Preview Test", data['patient_count'])
+		except HttpError as exception:
+			logTest(logfile, args.tier, "Cohorts Preview ERROR", exception)
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
@@ -161,6 +109,8 @@ if __name__ == "__main__":
 	parser.add_argument("-p", "--patient", action = "store_true", help = "Create cohort using patient barcodes")
 	parser.add_argument("-z", "--createcohort", action = "store_true", help = "Actually create the cohort, not just preview")
 	parser.add_argument("-n", "--cohortname", required = True, help = "Name to give the cohort")
+	programchoice = ["TCGA", "TARGET", "CCLE"]
+	parser.add_argument("-g", "--program", required = True, type = str.upper, choices = programchoice, help = "Program  (TCGA, TARGET, CCLE) that the tests will be run on")
 	args = parser.parse_args()
 
 	main(args)

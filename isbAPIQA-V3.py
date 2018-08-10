@@ -121,7 +121,7 @@ def cohortsFiles(service, cohort_id, limit):
 	
 def cohortsPreview(service, body):
 	try:
-		data = service.cohorts().preview(**body).execute()
+		data = service.cohorts().preview(body=body).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -136,7 +136,6 @@ def cohortsGet(service, cohort_id):
 def cohortsCreate(service, name, body):
 	try:
 		data = service.cohorts().create(name=name, body=body).execute()
-		pprint.pprint(data)
 		return data
 	except HttpError as exception:
 		raise exception
@@ -230,11 +229,12 @@ def main(args):
 	version = "v3"
 	program_api = getProgram(args.program)
 	site = getSite(args.tier)
+
 	
 	preview_request = {
-		'TCGA' : '{"project_short_name" : ["TCGA-BRCA", "TCGA-UCS"], "age_at_diagnosis_gte": 90}',
-		'TARGET' : '{"project_short_name" : ["TARGET-AML", "TARGET-WT"], "age_at_diagnosis_gte": 7}',
-		'CCLE' : '{"project_short_name" : ["CCLE-COAD", "CCLE-READ"], "gender": "Male"}'
+		'TCGA' : '{"Common": {"project_short_name": ["TCGA-BRCA","TCGA-UCS"]}, "Clinical": {"age_at_diagnosis_gte": 90}}',
+		'TARGET' : '{"Common" : {"project_short_name" : ["TARGET-AML", "TARGET-WT"]}, "Clinical" : {"age_at_diagnosis_gte": 7}}',
+		'CCLE' : '{"Common" : {"project_short_name" : ["CCLE-COAD", "CCLE-READ"]}, "Clinical" : {"gender": "Male"}}'
 		}
 	testing_cohort_request = {
 		'TARGET' : '{"program_name" : ["TARGET"] }',
@@ -376,13 +376,14 @@ def main(args):
 		logTest(logfile, args.program, args.tier, "Sample File Path Test", "FAIL", exception)
 	
 	#Test User Endpoint
-	
-	vPrint(args.verbose, "users().get() test")
-	try:
-		data = usersGet(program_auth_service)
-		logTest(logfile, args.program, args.tier, "Users Get Test", "PASS", data['message'])
-	except HttpError as exception:
-		logTest(logfile, args.program, args.tier, "Users Get Test", "FAIL", exception)
+	#Don't test if CCLE, it doesn't have this
+	if (args.program != "CCLE"):
+		vPrint(args.verbose, "users().get() test")
+		try:
+			data = usersGet(program_auth_service)
+			logTest(logfile, args.program, args.tier, "Users Get Test", "PASS", data['message'])
+		except HttpError as exception:
+			logTest(logfile, args.program, args.tier, "Users Get Test", "FAIL", exception)
 	
 	#Check the annotations endpoints only if testing TCGA
 	if (args.program == "TCGA"):
