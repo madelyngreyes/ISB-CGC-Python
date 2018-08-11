@@ -124,7 +124,7 @@ def cohortsFileManifest(service, cohort_id, limit, offset, filters):
 		if not filters:
 			data = service.cohorts().file_manifest(fetch_count=limit, offset=offset, cohort_id=cohort_id).execute()
 		else:
-			data = service.cohorts().file_manifest_filtered(body={"filters": filters}, fetch_count=limit, offset=offset, cohort_id=cohort_id).execute()
+			data = service.cohorts().file_manifest_filtered(body=filters, fetch_count=limit, offset=offset, cohort_id=cohort_id).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -167,7 +167,7 @@ def casesGet(service, barcode):
 
 def casesGetList(service, barcodes):
 	try:
-		data = service.cases().get_list(body={"filters": {"case_barcodes": barcodes}}).execute()
+		data = service.cases().get_list(body={"case_barcodes": barcodes}).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -183,7 +183,7 @@ def samplesGet(service,barcode):
 
 def samplesGetList(service,barcodes):
 	try:
-		data = service.samples().get_list(body={"filters": {"sample_barcodes": barcodes}}).execute()
+		data = service.samples().get_list(body={"sample_barcodes": barcodes}).execute()
 		return data
 	except HttpError as exception:
 		raise exception
@@ -416,15 +416,15 @@ def main(args):
 		data = casesGet(program_auth_service, case_barcode[args.program])
 		logTest(logfile, args.program, args.tier, "Patient Get Test", "PASS", "Number of samples for case: " + str(len(data['samples'])))
 	except HttpError as exception:
-		logTest(logfile, args.program, args.tier, "Patients Get Test", "FAIL" , exception)
+		logTest(logfile, args.program, args.tier, "Patient Get Test", "FAIL" , exception)
 
 	#test cases().get_list()
 	vPrint(args.verbose, "cases().get_list() test")
 	try:
 		data = casesGetList(program_auth_service, case_barcodes[args.program])
-		logTest(logfile, args.program, args.tier, "Patient Get Test", "PASS", "Number of samples for case: " + str(len(data['samples'])))
+		logTest(logfile, args.program, args.tier, "Patients Get List  Test", "PASS", "Number of cases found: " + str(len(data['cases'])))
 	except HttpError as exception:
-		logTest(logfile, args.program, args.tier, "Patients Get Test", "FAIL" , exception)
+		logTest(logfile, args.program, args.tier, "Patients Get List Test", "FAIL" , exception)
 
 	#Test Sample Endpoints
 	
@@ -440,7 +440,7 @@ def main(args):
 	vPrint(args.verbose, "samples().get_list() test")
 	try:
 		data = samplesGetList(program_auth_service, sample_barcodes[args.program])
-		logTest(logfile, args.program, args.tier, "Sample Get List Test", "PASS", "Number of sample detail sections: " + str(data['data_details_count']))
+		logTest(logfile, args.program, args.tier, "Sample Get List Test", "PASS", "Number of samples found: " + str(len(data['samples'])))
 	except HttpError as exception:
 		logTest(logfile, args.program, args.tier, "Samples Get List test", "FAIL", exception)
 
