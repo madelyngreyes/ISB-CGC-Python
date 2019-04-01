@@ -203,28 +203,6 @@ def usersGet(service):
 	except HttpError as exception:
 		raise exception
 
-#Annotation testing (Currently TCGA only)
-def aliquotAnnotations(service,barcode):
-	try:
-		data = service.aliquots().annotations(aliquot_barcode=barcode).execute()
-		return data
-	except HttpError as exception:
-		raise exception
-
-def sampleAnnotations(service,barcode):
-	try:
-		data = service.samples().annotations(sample_barcode=barcode).execute()
-		return data
-	except HttpError as exception:
-		raise exception
-
-def caseAnnotations(service,barcode):
-	try:
-		data = service.cases().annotations(case_barcode=barcode).execute()
-		return data
-	except HttpError as exception:
-		raise exception
-
 def getCohortIDs(cohortlist, cohortname, program):
 	cohortdictionary = {
 		'TCGA' : None,
@@ -462,34 +440,6 @@ def main(args):
 		except HttpError as exception:
 			logTest(logfile, args.program, args.tier, "Users Get Test", "FAIL", exception)
 	
-	#Check the annotations endpoints only if testing TCGA
-	if (args.program == "TCGA"):
-		
-		#Test Aliquot Annotation
-		vPrint(args.verbose, "aliquots().annotations() test")
-		try:
-			data = aliquotAnnotations(program_auth_service, aliquot_barcode[args.program])
-			logTest(logfile, args.program, args.tier, "Aliquot Annotation Test", "PASS", "Number of aliquot annotations: " + str(data['count']))
-		except HttpError as exception:
-			logTest(logfile, args.program, args.tier, "Aliquot Annotation Test", "FAIL",  exception)
-			
-		#Test Sample Annotation
-		vPrint(args.verbose, "samples().annotations() test")
-		try:
-			data = sampleAnnotations(program_auth_service, sample_barcode[args.program])
-			logTest(logfile, args.program, args.tier, "Sample Annotation Test", "PASS", "Number of sample annotations: " + str(data['count']))
-		except HttpError as exception:
-			logTest(logfile, args.program, args.tier, "Sample Annotation Test", "FAIL", exception)
-		
-		#Test Case Annotation
-		vPrint(args.verbose, "cases().annotations() test")
-		try:
-			data = caseAnnotations(program_auth_service, case_barcode[args.program])
-			logTest(logfile, args.program, args.tier, "Case Annotation Test", "PASS", "Number of case annotations: " + str(data['count']))
-		except HttpError as exception:
-			logTest(logfile, args.program, args.tier, "Case Annotation Test", "FAIL", exception)
-
-
 	logfile.close()
 	
 	
