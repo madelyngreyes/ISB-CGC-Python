@@ -439,7 +439,7 @@ def main(args):
 			logTest(logfile, args.program, args.tier, "Users Get Test", "PASS", data['message'])
 		except HttpError as exception:
 			logTest(logfile, args.program, args.tier, "Users Get Test", "FAIL", exception)
-	
+
 	logfile.close()
 	
 	
